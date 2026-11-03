@@ -1,0 +1,33 @@
+{
+  "built_from": "7f464a5e4bd629d46a21ac4d0d14221719c0177a",
+  "target": "x86_64-pc-windows-msvc",
+  "profile": "release",
+  "roles": [
+    "teacher",
+    "student",
+    "parent"
+  ],
+  "build_passed": true,
+  "physical_device_tests": false,
+  "publication_approved": false,
+  "artifacts": [
+    {
+      "role": "teacher",
+      "file": "D:\\ThinkGrow-Work\\thinkgrow-offline-app\\target\\release\\teacher.exe",
+      "bytes": 14376448,
+      "sha256": "1050ffd9d583004438a93e21ecab785672adaaabfc848451232cd1290e16ece0"
+    },
+    {
+      "role": "student",
+      "file": "D:\\ThinkGrow-Work\\thinkgrow-offline-app\\target\\release\\student.exe",
+      "bytes": 14380032,
+      "sha256": "c2feedcc2ce224bcf02e5b90b29822cbb047aca9338d103d319f0464d2a774bf"
+    },
+    {
+      "role": "parent",
+      "file": "D:\\ThinkGrow-Work\\thinkgrow-offline-app\\target\\release\\parent.exe",
+      "bytes": 13903360,
+      "sha256": "05fa3911c815530eab190a9888b17b9582f34a650febc8866e397312beaa7f5b"
+    }
+  ]
+}
