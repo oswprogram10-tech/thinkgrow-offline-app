@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-sync-role-draft"
+description = "Enables the sync_role_draft command without any pre-configured scope."
+commands.allow = ["sync_role_draft"]
+
+[[permission]]
+identifier = "deny-sync-role-draft"
+description = "Denies the sync_role_draft command without any pre-configured scope."
+commands.deny = ["sync_role_draft"]

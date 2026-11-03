@@ -64,6 +64,8 @@ class VaultPlugin(private val activity: Activity): Plugin(activity) {
     fun redeem(invoke: Invoke) = post(invoke, "devices/redeem", 16384, 262144, false)
     @Command
     fun lessons(invoke: Invoke) = post(invoke, "lessons/prepare", 131072, 1048576, true)
+    @Command
+    fun roleExchange(invoke: Invoke) = post(invoke, "roles/exchange", 262144, 2097152, true)
     private fun post(invoke: Invoke, path: String, maxRequest: Int, maxResponse: Int, signedRequest: Boolean) = execute(invoke) { data, entropy ->
         require(entropy.isEmpty() && data.size <= maxRequest)
         val request = JSONObject(String(data,Charsets.UTF_8))
@@ -77,6 +79,7 @@ class VaultPlugin(private val activity: Activity): Plugin(activity) {
             connection.setRequestProperty("Content-Type", "application/json")
             connection.setFixedLengthStreamingMode(data.size)
             connection.outputStream.use { it.write(data) }
+            if (path == "roles/exchange" && connection.responseCode == 409) return@execute "{\"conflict\":true}".toByteArray()
             require(connection.responseCode in listOf(200,201))
             require(connection.contentLengthLong <= maxResponse)
             connection.inputStream.use { stream ->

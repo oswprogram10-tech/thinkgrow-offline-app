@@ -30,13 +30,17 @@ async function refreshAccounts() {
 }
 function showSession(core) {
   const local = core.local;
+  const role=document.body.dataset.role;
+  document.querySelector("h1").textContent=local?({teacher:"수업과 채점",student:"내 수업",parent:"자녀 소식"}[role]||"기기 보관함"):"이 기기에서 시작하기";
+  document.querySelector(".lead").textContent=local?({teacher:"제출물을 준비해 채점하고 필요한 게임을 수업에 배정하세요.",student:"준비한 수업을 작성하고 배정된 게임을 실행하세요.",parent:"선생님이 공유한 자녀의 학습 기록과 소식을 확인하세요."}[role]||""):"계정마다 수업 자료를 따로 보관합니다. 사용을 마친 뒤에는 계정을 잠가 주세요.";
+  for(const detail of document.querySelectorAll("main > details.security-settings"))detail.hidden=!!local;
   $("account-forms").hidden = !!local; $("workspace").hidden = !local;
   window.thinkgrowSession=core;
   window.dispatchEvent(new CustomEvent("thinkgrow-session", {detail:core}));
   if (!local) return;
   $("access-state").textContent = local.access === "read_write" ? "이 계정의 자료를 사용할 수 있습니다." : "자격이 만료되었거나 기기 시간을 확인해야 합니다. 자료는 보존하며 읽기·복구만 허용합니다.";
   const summary = $("local-summary"); summary.replaceChildren();
-  for (const [label, count] of [["보관 중인 초안", local.drafts], ["교실 전송 대기", local.pending_classroom], ["온라인 전송 대기", local.pending_online], ["설치한 게임", local.installed_games]]) {
+  for (const [label, count] of [["보관 중인 초안", local.drafts], ["교실 전송 대기", local.pending_classroom], ["온라인 전송 대기", local.pending_online], ["설치한 게임", local.games_unavailable?"확인 필요":local.installed_games]]) {
     const term = document.createElement("dt"), value = document.createElement("dd"); term.textContent = label; value.textContent = count; summary.append(term, value);
   }
 }
@@ -97,14 +101,15 @@ $("lock").addEventListener("click", () => operation("lock_account", {}));
 async function backgroundLock() {
   clearSecrets(); if (!invoke) return;
   $("workspace").hidden = true;
-  try { await window.thinkgrowBeforeLock?.(); showSession(await invoke("lock_account")); message("계정을 잠갔습니다. 숫자코드로 다시 열어 주세요."); } catch { message("계정 잠금을 확인하지 못했습니다. 앱을 닫아 주세요.", true); }
+  let saved=true;try { await window.thinkgrowBeforeLock?.(); } catch { saved=false; }
+  try { showSession(await invoke("lock_account")); message(saved?"계정을 잠갔습니다. 숫자코드로 다시 열어 주세요.":"계정을 잠갔습니다. 마지막 편집을 저장하지 못했을 수 있습니다. 다시 열어 저장 상태를 확인하세요.",!saved); } catch { message("계정 잠금을 확인하지 못했습니다. 앱을 닫아 주세요.", true); }
 }
 document.addEventListener("visibilitychange", () => { if (document.hidden) backgroundLock(); });
 for (const name of ["pointerdown", "keydown"]) document.addEventListener(name, () => { clearTimeout(idle); idle = setTimeout(backgroundLock, 5 * 60 * 1000); }, {passive:true});
 (async () => {
   if (!invoke) { message("계정 등록과 자료 보관은 설치한 앱에서 사용할 수 있습니다."); return; }
   try {
-    await refreshAccounts(); showSession(await invoke("core_status"));
-    message(!accountState.platform_supported ? "이 기기의 보호 저장소 연결을 준비 중입니다." : !accountState.service_configured ? "기기 등록 서비스를 준비 중입니다. 정식판 공개 후 새 계정을 등록할 수 있습니다." : "저장된 계정을 열거나 이 기기를 등록하세요.");
+    await refreshAccounts(); const core=await invoke("core_status");showSession(core);
+    message(core.local?"계정을 열었습니다. 사용을 마친 뒤에는 잠가 주세요.":!accountState.platform_supported ? "이 기기의 보호 저장소 연결을 준비 중입니다." : !accountState.service_configured ? "기기 등록 서비스를 준비 중입니다. 정식판 공개 후 새 계정을 등록할 수 있습니다." : "저장된 계정을 열거나 이 기기를 등록하세요.");
   } catch { message("기기 보관함을 확인하지 못했습니다. 기존 자료는 지우지 않습니다.", true); }
 })();

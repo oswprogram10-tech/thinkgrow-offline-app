@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>생각쑥쑥 학생</title><link rel="stylesheet" href="./app.css"><script src="./app.js" defer></script><script src="./student.js" defer></script></head>
+<title>생각쑥쑥 학생</title><link rel="stylesheet" href="./app.css"><script src="./app.js" defer></script><script src="./student.js" defer></script><script src="./roles.js" defer></script><script src="./games.js" defer></script></head>
 <body data-role="student"><main>
  <header><p class="eyebrow">생각쑥쑥 · 학생 전용 앱</p><span class="build-state">개발 중</span></header>
  <h1>이 기기에서 시작하기</h1><p class="lead">계정마다 수업 자료를 따로 보관합니다.<br>사용을 마친 뒤에는 계정을 잠가 주세요.</p>
@@ -38,6 +38,17 @@
  </details>
  <section id="workspace" hidden aria-labelledby="workspace-title"><div class="session-title"><h2 id="workspace-title">기기 보관함</h2><button id="lock" type="button" class="secondary">계정 잠그기</button></div>
   <p id="access-state"></p><dl id="local-summary"></dl>
+<section class="role-section" aria-labelledby="role-title">
+      <div class="lesson-toolbar"><h2 id="role-title">배정된 게임 준비</h2><button type="button" id="role-refresh">온라인 자료 새로 받기</button></div>
+      <p id="role-notice" role="status" aria-live="polite"></p>
+      <div class="lesson-layout"><nav id="role-list" aria-label="배정된 게임 준비 목록"></nav><div id="role-editor"></div></div>
+    </section><section id="games-section" class="role-section" aria-labelledby="games-title">
+          <h2 id="games-title">게임 보관함</h2><p class="hint">기본 설치 게임은 없습니다. 승인된 게임을 개별 설치합니다. 이 실행기는 오프라인 단독 실행을 지원하는 정적 게임용입니다.</p>
+          <label for="game-catalog">수업에 배정된 게임</label><select id="game-catalog"><option value="">온라인 자료를 새로 받아 목록을 확인하세요</option></select>
+          <div class="answer-actions"><button id="game-install" type="button">선택한 게임 설치</button></div>
+          <p id="game-notice" role="status" aria-live="polite">진행 기록과 체크포인트는 기기에 보관됩니다. 게임의 자체 점수는 공식 평가 점수로 반영되지 않습니다.</p>
+          <div id="installed-games"></div><button id="game-stop" type="button" class="secondary" hidden>게임 종료</button><div id="game-stage"></div>
+        </section>
   <details class="security-settings"><summary>잠금 숫자코드 변경</summary><p class="hint">현재 숫자코드를 확인한 뒤 새 코드를 저장합니다. 변경 후에는 계정이 잠기며 보관 자료는 그대로 유지됩니다.</p>
    <form id="change-pin-form"><fieldset disabled><label for="current-pin">현재 숫자코드</label><input id="current-pin" name="currentPin" type="password" inputmode="numeric" pattern="[0-9]{6,12}" minlength="6" maxlength="12" autocomplete="current-password" required>
     <label for="new-pin">새 숫자코드</label><input id="new-pin" name="newPin" type="password" inputmode="numeric" pattern="[0-9]{6,12}" minlength="6" maxlength="12" autocomplete="new-password" required>

@@ -1,7 +1,7 @@
 name: Offline core checks
 on:
   push:
-    paths: ['crates/**', 'apps/**', 'tools/release_bridge.py', 'tools/test_release_bridge.py', 'scripts/**', 'release/**', 'contracts/**', 'Cargo.*', '.github/workflows/**']
+    paths: ['crates/**', 'apps/**', 'tools/release_bridge.py', 'tools/test_release_bridge.py', 'tools/verify_role_ui.mjs', 'scripts/**', 'release/**', 'contracts/**', 'Cargo.*', '.github/workflows/**']
   pull_request:
   workflow_dispatch:
 permissions:
@@ -32,6 +32,8 @@ jobs:
         run: cargo test --locked -p thinkgrow-offline-core
       - name: Native app command boundary compilation
         run: cargo check --locked -p teacher -p student -p parent
+      - name: Synthetic role UI and game frame checks
+        run: node tools/verify_role_ui.mjs
       - name: Release staging binary
         run: cargo build --locked -p thinkgrow-offline-core --bin release-check
       - name: Real Tauri signature and release bridge checks
@@ -39,4 +41,7 @@ jobs:
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: release-bridge-evidence
-          path: docs/build-evidence/release-bridge-*.json
+          path: |
+            docs/build-evidence/release-bridge-*.json
+            target/role-ui-validation/report.json
+            target/role-ui-validation/*.png

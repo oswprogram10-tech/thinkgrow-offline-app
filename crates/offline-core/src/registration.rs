@@ -13,6 +13,7 @@ struct Policy { #[serde(default)] registration_enabled:bool, format:u32,service_
 pub struct AccountStatus {pub platform_supported:bool,pub service_configured:bool,pub accounts:Vec<LocalAccount>}
 pub trait EnrollmentClient:Send+Sync { fn redeem(&self,request_json:&[u8])->Result<Signed>;
     fn lessons(&self,_request_json:&[u8])->Result<Vec<Signed>> {Err(Error::ServiceNotConfigured)}
+    fn role_exchange(&self,_request_json:&[u8])->Result<Signed> {Err(Error::ServiceNotConfigured)}
 }
 pub struct Registration {base:PathBuf,vault:Vault,app:App,context:Arc<NativeContext>,trust:Trust,active_credential_keys:BTreeSet<String>,origin:String,enrollment_enabled:bool,transport:Option<Arc<dyn EnrollmentClient>>,operation:Mutex<()>}
 impl Registration {
@@ -33,6 +34,16 @@ impl Registration {
     pub fn prepare_lessons(&self)->Result<Vec<crate::lesson::Lesson>> {
         let _guard=self.guard()?;
         self.context.prepare_lessons(|request|if let Some(transport)=&self.transport {transport.lessons(request)}else{fetch_lessons(&self.origin,request)})
+    }
+    pub fn role_exchange(&self,action:&str,data:serde_json::Value)->Result<crate::workspace::RoleReply>{
+        let _guard=self.guard()?;self.context.role_exchange(action,data,|request|self.fetch_role(request))
+    }
+    pub fn sync_role_draft(&self,slot:&str,revision:u64)->Result<crate::workspace::RoleDraft>{
+        let _guard=self.guard()?;self.context.sync_role_draft(slot,revision,|request|self.fetch_role(request))
+    }
+    fn fetch_role(&self,request:&[u8])->Result<Signed>{
+        let signed=if let Some(transport)=&self.transport{transport.role_exchange(request)}else{fetch_role(&self.origin,request)}?;
+        if !self.active_credential_keys.contains(&signed.key_id){return Err(Error::Signature)}Ok(signed)
     }
     pub fn lock(&self)->Result<CoreStatus> {let _guard=self.guard()?;self.context.lock_account()?;self.context.status()}
     pub fn unlock(&self,handle:&str,pin:String)->Result<CoreStatus> {
@@ -110,6 +121,7 @@ impl Registration {
                 DataKey::new(payload.secrets.data_key),SigningKey::from_bytes(&payload.secrets.signer_seed),self.trust.clone())?;
             store.install_grant(grant,payload.wall_floor.max(verified_grant.as_ref().ok_or(Error::Authorization)?.issued_ms))?;
             if stage_dir.join("lessons.sqlite3").exists() {store.lessons()?;}
+            if stage_dir.join("role.sqlite3").exists() {store.role_workspace()?;store.role_drafts()?;}
             drop(store);
             let target=Store::home_path(&self.base,self.app,subject,&payload.secrets.device_id)?;
             if target.exists() {return Err(Error::Conflict)}
@@ -192,10 +204,10 @@ fn collect_backup_files(home:&Path,scratch:&Path)->Result<Vec<BackupFile>> {
                 let relative=format!("blobs/{leaf}");backup_relative_path(&relative)?;
                 add_backup_file(&blob.path(),relative,&mut files,&mut total)?;
             }
-        }else if name=="store.sqlite3" || name=="lessons.sqlite3" {
+        }else if name=="store.sqlite3" || name=="lessons.sqlite3" || name=="role.sqlite3" {
             let destination=scratch.join(&name);snapshot_database(&path,&destination)?;
             add_backup_file(&destination,name,&mut files,&mut total)?;
-        }else if ["store.sqlite3-wal","store.sqlite3-shm","store.sqlite3-journal","lessons.sqlite3-wal","lessons.sqlite3-shm","lessons.sqlite3-journal"].contains(&name.as_str()) {
+        }else if ["store.sqlite3-wal","store.sqlite3-shm","store.sqlite3-journal","lessons.sqlite3-wal","lessons.sqlite3-shm","lessons.sqlite3-journal","role.sqlite3-wal","role.sqlite3-shm","role.sqlite3-journal","games.sqlite3","games.sqlite3-wal","games.sqlite3-shm","games.sqlite3-journal"].contains(&name.as_str()) {
             if !meta.is_file() || meta.file_type().is_symlink() {return Err(Error::VaultUnavailable)}
         }else{
             return Err(Error::Invalid("unsupported account file"));
@@ -211,7 +223,7 @@ fn add_backup_file(path:&Path,relative:String,files:&mut Vec<BackupFile>,total:&
     files.push(BackupFile{path:relative,content:STANDARD.encode(&bytes)});bytes.fill(0);Ok(())
 }
 fn backup_relative_path(path:&str)->Result<PathBuf> {
-    const DATABASE_FILES:[&str;2]=["store.sqlite3","lessons.sqlite3"];
+    const DATABASE_FILES:[&str;3]=["store.sqlite3","lessons.sqlite3","role.sqlite3"];
     if DATABASE_FILES.contains(&path) {return Ok(PathBuf::from(path))}
     if let Some(leaf)=path.strip_prefix("blobs/") {
         let valid_hash=leaf.len()==64 && leaf.bytes().all(|byte|byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
@@ -290,6 +302,18 @@ mod tests {
     fn sign(grant:&Grant,issuer:&SigningKey)->Signed {
         let payload=serde_json::to_string(grant).unwrap();let signature=crypto::sign(issuer,"thinkgrow.credential.v1",payload.as_bytes());
         Signed{key_id:"synthetic-issuer".into(),payload,signature}
+    }
+    #[test]
+    fn new_role_responses_require_an_active_issuer_even_when_old_keys_are_cached() {
+        struct Transport;
+        impl EnrollmentClient for Transport {
+            fn redeem(&self,_:&[u8])->Result<Signed>{Err(Error::ServiceNotConfigured)}
+            fn role_exchange(&self,_:&[u8])->Result<Signed>{Ok(Signed{key_id:"retired-issuer".into(),payload:"{}".into(),signature:String::new()})}
+        }
+        let dir=tempfile::tempdir().unwrap();let (mut registration,issuer,_)=setup(dir.path());
+        registration.trust.credentials.insert("retired-issuer".into(),issuer.verifying_key().to_bytes());
+        registration.transport=Some(Arc::new(Transport));
+        assert!(matches!(registration.fetch_role(b"{}"),Err(Error::Signature)));
     }
     #[test]
     fn unconfigured_build_never_creates_a_device_or_calls_server() {
@@ -371,3 +395,17 @@ fn fetch_lessons(origin:&str,request:&[u8])->Result<Vec<Signed>> {
 }
 #[cfg(not(windows))]
 fn fetch_lessons(_origin:&str,_request:&[u8])->Result<Vec<Signed>> {Err(Error::VaultUnavailable)}
+
+#[cfg(windows)]
+fn fetch_role(origin:&str,request:&[u8])->Result<Signed> {
+    use std::{io::Read,time::Duration};
+    #[derive(Deserialize)] #[serde(deny_unknown_fields)] struct Reply{reply:Signed}
+    let client=reqwest::blocking::Client::builder().https_only(true).redirect(reqwest::redirect::Policy::none()).connect_timeout(Duration::from_secs(8)).timeout(Duration::from_secs(30)).build().map_err(|_|Error::RegistrationFailed)?;
+    let response=client.post(format!("{origin}/api/offline/v1/roles/exchange")).header("Content-Type","application/json").body(request.to_vec()).send().map_err(|_|Error::RegistrationFailed)?;
+    match response.status().as_u16(){409=>return Err(Error::Conflict),403=>return Err(Error::Authorization),200=>(),_=>return Err(Error::RegistrationFailed)}
+    if response.content_length().is_some_and(|n|n>2097152){return Err(Error::RegistrationFailed)}
+    let mut raw=Zeroizing::new(Vec::new());response.take(2097153).read_to_end(&mut raw).map_err(|_|Error::RegistrationFailed)?;
+    if raw.len()>2097152{return Err(Error::RegistrationFailed)}Ok(serde_json::from_slice::<Reply>(&raw)?.reply)
+}
+#[cfg(not(windows))]
+fn fetch_role(_origin:&str,_request:&[u8])->Result<Signed>{Err(Error::VaultUnavailable)}

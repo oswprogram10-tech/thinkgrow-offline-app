@@ -4,12 +4,12 @@ use serde::Serialize;
 use std::{path::PathBuf,sync::{Mutex,MutexGuard},time::{Instant,SystemTime,UNIX_EPOCH}};
 pub struct NativeAccount {pub subject:String,pub device:String,pub data_key:DataKey,pub device_signer:SigningKey}
 struct ClockAnchor {wall_start:i64,monotonic_start:Instant}
-pub struct NativeContext {base:PathBuf,app:App,session:Mutex<Option<Store>>,clock:Mutex<ClockAnchor>}
+pub struct NativeContext {base:PathBuf,app:App,session:Mutex<Option<Store>>,clock:Mutex<ClockAnchor>,game:Mutex<Option<crate::game_host::GameHost>>}
 #[derive(Serialize)]
 pub struct CoreStatus {pub app_id:&'static str,pub protocol:u32,pub schema:u32,pub registration_required:bool,
     pub local:Option<Status>,pub default_games:u32}
 impl NativeContext {
-    pub fn new(base:PathBuf,app:App)->Self{Self{base,app,session:Mutex::new(None),clock:Mutex::new(ClockAnchor{wall_start:now(),monotonic_start:Instant::now()})}}
+    pub fn new(base:PathBuf,app:App)->Self{Self{base,app,session:Mutex::new(None),clock:Mutex::new(ClockAnchor{wall_start:now(),monotonic_start:Instant::now()}),game:Mutex::new(None)}}
     /// Called only by a native registration/reauthentication adapter with vault-held keys.
     /// This is deliberately not exposed as a Tauri command.
     pub fn attach_registered_account(&self,account:NativeAccount,trust:Trust,grant:Option<&Signed>,now:i64,trusted_time:Option<i64>)->Result<()> {
@@ -58,6 +58,33 @@ impl NativeContext {
         let intent=uuid::Uuid::parse_str(intent).map_err(|_|Error::Invalid("submission intent"))?;
         let current=self.checked_now();self.lock()?.as_mut().ok_or(Error::Authorization)?.submit_prepared(assignment,revision,intent,current)
     }
-    pub fn lock_account(&self)->Result<()>{*self.lock()?=None;Ok(())}
+    pub fn role_workspace(&self)->Result<Option<crate::workspace::RoleReply>>{self.lock()?.as_ref().ok_or(Error::Authorization)?.role_workspace()}
+    pub fn role_drafts(&self)->Result<Vec<crate::workspace::RoleDraft>>{self.lock()?.as_ref().ok_or(Error::Authorization)?.role_drafts()}
+    pub fn save_role_draft(&self,kind:&str,data:serde_json::Value,expected:u64)->Result<crate::workspace::RoleDraft>{self.lock()?.as_ref().ok_or(Error::Authorization)?.save_role_draft(kind,data,expected,self.checked_now())}
+    pub fn role_exchange(&self,action:&str,data:serde_json::Value,fetch:impl FnOnce(&[u8])->Result<Signed>)->Result<crate::workspace::RoleReply>{
+        let session=self.lock()?;let store=session.as_ref().ok_or(Error::Authorization)?;let id=uuid::Uuid::new_v4().to_string();
+        if !["workspace","install_game","assign_game","parent_read","notice_read","notice_reply"].contains(&action){return Err(Error::Authorization)}
+        let request=store.role_request(action,data,&id,self.checked_now())?;let reply=fetch(&request)?;store.accept_role_reply(&reply,action,&id,self.checked_now())
+    }
+    pub fn sync_role_draft(&self,slot:&str,revision:u64,fetch:impl FnOnce(&[u8])->Result<Signed>)->Result<crate::workspace::RoleDraft>{
+        let session=self.lock()?;let store=session.as_ref().ok_or(Error::Authorization)?;let draft=store.role_draft(slot,revision)?;
+        if draft.state=="synced"{return Ok(draft)}
+        let request=store.role_request(&draft.kind,draft.data.clone(),&draft.operation_id,self.checked_now())?;
+        let signed=match fetch(&request){Ok(s)=>s,Err(Error::Conflict)=>{store.finish_role_draft(draft,None)?;return Err(Error::Conflict)},Err(e)=>return Err(e)};
+        store.accept_role_reply(&signed,&draft.kind,&draft.operation_id,self.checked_now())?;store.finish_role_draft(draft,Some(signed))
+    }
+    pub fn installed_games(&self)->Result<Vec<crate::workspace::GameInfo>>{self.lock()?.as_ref().ok_or(Error::Authorization)?.installed_games()}
+    pub fn launch_game(self:&std::sync::Arc<Self>,id:&str)->Result<crate::game_host::Launch>{
+        self.launch_game_for(id,None)
+    }
+    pub fn launch_game_for(self:&std::sync::Arc<Self>,id:&str,assignment:Option<&str>)->Result<crate::game_host::Launch>{
+        self.stop_game()?;let (run,bundle)=self.lock()?.as_ref().ok_or(Error::Authorization)?.start_game_for(id,assignment,self.checked_now())?;
+        let (host,launch)=crate::game_host::GameHost::start(std::sync::Arc::downgrade(self),self.app,run,bundle)?;
+        *self.game.lock().map_err(|_|Error::Authorization)?=Some(host);Ok(launch)
+    }
+    pub fn stop_game(&self)->Result<()>{*self.game.lock().map_err(|_|Error::Authorization)?=None;Ok(())}
+    pub fn game_run(&self,id:&str)->Result<crate::workspace::GameRun>{self.lock()?.as_ref().ok_or(Error::Authorization)?.game_run(id,self.checked_now())}
+    pub fn record_game_event(&self,id:&str,event:serde_json::Value)->Result<serde_json::Value>{self.lock()?.as_ref().ok_or(Error::Authorization)?.game_event(id,event,self.checked_now())}
+    pub fn lock_account(&self)->Result<()>{self.stop_game()?;*self.lock()?=None;Ok(())}
 }
 pub fn now()->i64{SystemTime::now().duration_since(UNIX_EPOCH).map(|d|d.as_millis().min(i64::MAX as u128) as i64).unwrap_or(0)}

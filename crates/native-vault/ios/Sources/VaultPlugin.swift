@@ -56,6 +56,7 @@ class VaultPlugin: Plugin {
     @objc func unseal(_ invoke:Invoke) throws {try operation(invoke,encrypt:false)}
     @objc func redeem(_ invoke:Invoke) throws {try post(invoke,path:"devices/redeem",limit:262144,signed:false)}
     @objc func lessons(_ invoke:Invoke) throws {try post(invoke,path:"lessons/prepare",limit:1048576,signed:true)}
+    @objc func roleExchange(_ invoke:Invoke) throws {try post(invoke,path:"roles/exchange",limit:2097152,signed:true)}
     private func post(_ invoke:Invoke,path:String,limit:Int,signed:Bool) throws {
         let args=try invoke.parseArgs(VaultArguments.self)
         guard args.entropy.isEmpty,let data=Data(base64Encoded:args.data),data.count <= (signed ? 131072 : 16384),
@@ -90,6 +91,9 @@ private class EnrollmentExchange:NSObject,URLSessionDataDelegate {
     }
     func urlSession(_ session:URLSession,task:URLSessionTask,willPerformHTTPRedirection response:HTTPURLResponse,newRequest request:URLRequest,completionHandler:@escaping(URLRequest?)->Void){completionHandler(nil)}
     func urlSession(_ session:URLSession,dataTask:URLSessionDataTask,didReceive response:URLResponse,completionHandler:@escaping(URLSession.ResponseDisposition)->Void){
+        if let http=response as? HTTPURLResponse,path=="roles/exchange",http.statusCode==409 {
+            self.response=Data("{\"conflict\":true}".utf8);completionHandler(.cancel);finish(true);return
+        }
         guard let http=response as? HTTPURLResponse,[200,201].contains(http.statusCode),response.expectedContentLength<=limit else {completionHandler(.cancel);finish(false);return}
         completionHandler(.allow)
     }

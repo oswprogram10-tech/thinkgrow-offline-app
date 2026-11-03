@@ -43,7 +43,7 @@ impl<R:Runtime> Bridge<R> {
         if bytes.len()>1024*1024+8192 {return Err(thinkgrow_offline_core::Error::VaultUnavailable)}
         let payload=Request{data:base64::engine::general_purpose::STANDARD.encode(bytes),entropy:base64::engine::general_purpose::STANDARD.encode(entropy)};
         let response:Response=self.0.run_mobile_plugin(method,payload).map_err(|_|thinkgrow_offline_core::Error::VaultUnavailable)?;
-        if response.data.len()>2*1024*1024 {return Err(thinkgrow_offline_core::Error::VaultUnavailable)}
+        if response.data.len()>3*1024*1024 {return Err(thinkgrow_offline_core::Error::VaultUnavailable)}
         base64::engine::general_purpose::STANDARD.decode(response.data).map_err(|_|thinkgrow_offline_core::Error::VaultUnavailable)
     }
 }
@@ -55,6 +55,12 @@ impl<R:Runtime> OsProtector for Bridge<R> {
 }
 #[cfg(any(target_os="android",target_os="ios"))]
 impl<R:Runtime> EnrollmentClient for Bridge<R> {
+    fn role_exchange(&self,request_json:&[u8])->thinkgrow_offline_core::Result<thinkgrow_offline_core::Signed> {
+        #[derive(serde::Deserialize)] #[serde(deny_unknown_fields)] struct Reply{reply:thinkgrow_offline_core::Signed}
+        let bytes=self.call("roleExchange",request_json,b"").map_err(|_|thinkgrow_offline_core::Error::RegistrationFailed)?;
+        if bytes==b"{\"conflict\":true}"{return Err(thinkgrow_offline_core::Error::Conflict)}
+        Ok(serde_json::from_slice::<Reply>(&bytes)?.reply)
+    }
     fn redeem(&self,request_json:&[u8])->thinkgrow_offline_core::Result<thinkgrow_offline_core::Signed> {
         #[derive(serde::Deserialize)] struct Reply {credential:thinkgrow_offline_core::Signed}
         let bytes=self.call("redeem",request_json,b"").map_err(|_|thinkgrow_offline_core::Error::RegistrationFailed)?;

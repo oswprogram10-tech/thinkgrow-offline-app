@@ -100,10 +100,12 @@ impl Store {
         // Observe time even on read-only status calls; returning to an earlier
         // wall clock must not restore write access after an observed expiry.
         self.db.execute("UPDATE counters SET wall_floor=max(wall_floor,?1)",[now])?;
+        let games=if self.app==App::Parent{Ok(0)}else{self.installed_games().map(|games|games.len() as u64)};
+        let games_unavailable=games.is_err();
         Ok(Status{protocol:PROTOCOL,schema:SCHEMA,access:self.access(now)?,
             drafts:self.db.query_row("SELECT count(*) FROM drafts",[],|r|read_u64(r,0))?,
             pending_classroom:self.pending(Destination::Classroom)?,
-            pending_online:self.pending(Destination::Online)?,installed_games:0})
+            pending_online:self.pending(Destination::Online)?,installed_games:games.unwrap_or(0),games_unavailable})
     }
     pub fn pending(&self,dest:Destination)->Result<u64> {
         Ok(self.db.query_row("SELECT count(*) FROM deliveries WHERE destination=?1 AND state NOT IN ('received','cancelled')",
@@ -261,3 +263,5 @@ fn read_u64(row:&rusqlite::Row<'_>,index:usize)->rusqlite::Result<u64> {
 
 #[path="lesson_store.rs"]
 mod lesson_store;
+#[path="workspace.rs"]
+pub mod workspace;

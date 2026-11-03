@@ -10,6 +10,8 @@ pub mod transport;
 pub mod update;
 pub use contract::*;
 pub use store::Store;
+pub use store::workspace;
+pub mod game_host;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

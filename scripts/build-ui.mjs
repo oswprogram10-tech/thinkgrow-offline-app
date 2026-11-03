@@ -12,3 +12,4 @@ for (const [name, source] of [['index.html', join(root, 'apps', role, 'ui', 'ind
 console.log('Built local UI: ' + role);
 
 if (role === "student") writeFileSync(join(output,"student.js"),readFileSync(join(root,"apps/student/ui/student.js")));
+for(const name of ["roles.js", ...(role === "parent" ? [] : ["games.js"])]) writeFileSync(join(output,name),readFileSync(join(root,"apps/shared-ui",name)));

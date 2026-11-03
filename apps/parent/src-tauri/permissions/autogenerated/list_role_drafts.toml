@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-list-role-drafts"
+description = "Enables the list_role_drafts command without any pre-configured scope."
+commands.allow = ["list_role_drafts"]
+
+[[permission]]
+identifier = "deny-list-role-drafts"
+description = "Denies the list_role_drafts command without any pre-configured scope."
+commands.deny = ["list_role_drafts"]

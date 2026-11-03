@@ -4,9 +4,9 @@
   "profile": "debug",
   "status": "built_unpublished",
   "apk": "apps/parent/src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk",
-  "sha256": "65ac5b92bf3f4ef2acd37cd6f2138094b56508f5979d7e3534b8d0929785ae35",
-  "bytes": 134251530,
-  "native_sha256": "53957711749d95b57103eed5c0ef02fbaf0e98237d3e72fac3465d9ccfb9bddf",
+  "sha256": "5cabd5ccb4ead1ce2a62daabfc49d30d2d79da5360d65c31561aea53d8b2b84d",
+  "bytes": 64505846,
+  "native_sha256": "9f67bf40f3cf7145e51cde0b06c0ecef437cf8258dd974791a5ce5d54e6a3e40",
   "native_link_mode": "hardlink",
   "device_executed": false,
   "keystore_device_test": false

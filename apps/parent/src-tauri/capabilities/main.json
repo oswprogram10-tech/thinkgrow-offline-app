@@ -15,6 +15,11 @@
     "allow-export-account-backup",
     "allow-restore-account-backup",
     "allow-lock-account",
-    "allow-open-registration-page"
+    "allow-open-registration-page",
+    "allow-load-role-workspace",
+    "allow-role-exchange",
+    "allow-list-role-drafts",
+    "allow-save-role-draft",
+    "allow-sync-role-draft"
   ]
 }

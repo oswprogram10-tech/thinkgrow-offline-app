@@ -20,6 +20,11 @@
     "allow-lock-account",
     "allow-open-registration-page",
     "allow-list-lessons",
-    "allow-prepare-lessons"
+    "allow-prepare-lessons",
+    "allow-load-role-workspace",
+    "allow-role-exchange",
+    "allow-list-games",
+    "allow-launch-game",
+    "allow-stop-game"
   ]
 }

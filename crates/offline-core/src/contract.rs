@@ -101,7 +101,7 @@ pub struct Receipt {
 pub enum Access { ProvisioningRequired, ReadRecoveryOnly, ReadWrite }
 #[derive(Debug, Serialize)]
 pub struct Status { pub protocol:u32, pub schema:u32, pub access:Access, pub drafts:u64,
-    pub pending_classroom:u64, pub pending_online:u64, pub installed_games:u64 }
+    pub pending_classroom:u64, pub pending_online:u64, pub installed_games:u64, pub games_unavailable:bool }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Draft { pub revision:u64, pub answer:Answer }
 #[derive(Debug)]

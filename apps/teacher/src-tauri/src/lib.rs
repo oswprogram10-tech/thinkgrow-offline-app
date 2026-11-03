@@ -3,6 +3,29 @@ use tauri_plugin_opener::OpenerExt;
 use std::sync::Arc;
 use thinkgrow_offline_core::registration::{Registration,AccountStatus};
 use thinkgrow_offline_core::{App,runtime::{NativeContext,CoreStatus}};
+
+#[tauri::command]
+fn load_role_workspace(state:tauri::State<'_,Arc<NativeContext>>)->Result<Option<thinkgrow_offline_core::workspace::RoleReply>,String>{state.role_workspace().map_err(|e|e.to_string())}
+#[tauri::command]
+async fn role_exchange(state:tauri::State<'_,Arc<Registration>>,action:String,data:serde_json::Value)->Result<thinkgrow_offline_core::workspace::RoleReply,String>{
+ let registration=state.inner().clone();tauri::async_runtime::spawn_blocking(move||registration.role_exchange(&action,data).map_err(|e|e.to_string())).await.map_err(|_|"role operation interrupted; local data preserved".to_string())?
+}
+
+#[tauri::command]
+fn list_role_drafts(state:tauri::State<'_,Arc<NativeContext>>)->Result<Vec<thinkgrow_offline_core::workspace::RoleDraft>,String>{state.role_drafts().map_err(|e|e.to_string())}
+#[tauri::command]
+fn save_role_draft(state:tauri::State<'_,Arc<NativeContext>>,kind:String,data:serde_json::Value,expected:u64)->Result<thinkgrow_offline_core::workspace::RoleDraft,String>{state.save_role_draft(&kind,data,expected).map_err(|e|e.to_string())}
+#[tauri::command]
+async fn sync_role_draft(state:tauri::State<'_,Arc<Registration>>,slot:String,revision:u64)->Result<thinkgrow_offline_core::workspace::RoleDraft,String>{
+ let registration=state.inner().clone();tauri::async_runtime::spawn_blocking(move||registration.sync_role_draft(&slot,revision).map_err(|e|e.to_string())).await.map_err(|_|"send interrupted; local draft preserved".to_string())?
+}
+
+#[tauri::command]
+fn list_games(state:tauri::State<'_,Arc<NativeContext>>)->Result<Vec<thinkgrow_offline_core::workspace::GameInfo>,String>{state.installed_games().map_err(|e|e.to_string())}
+#[tauri::command]
+fn launch_game(state:tauri::State<'_,Arc<NativeContext>>,game_id:String,assignment_id:Option<String>)->Result<thinkgrow_offline_core::game_host::Launch,String>{state.inner().launch_game_for(&game_id,assignment_id.as_deref()).map_err(|e|e.to_string())}
+#[tauri::command]
+fn stop_game(state:tauri::State<'_,Arc<NativeContext>>)->Result<(),String>{state.stop_game().map_err(|e|e.to_string())}
 #[tauri::command]
 fn core_status(state:tauri::State<'_,Arc<NativeContext>>)->Result<CoreStatus,String>{state.status().map_err(|e|e.to_string())}
 #[tauri::command]
@@ -66,6 +89,6 @@ pub fn run(){
    app.manage(Arc::new(Registration::with_adapters(&base,App::Teacher,context.clone(),protector,transport)?));
    app.manage(context);
    Ok(())
- }).invoke_handler(tauri::generate_handler![core_status,open_registration_page,account_status,register_account,unlock_account,change_account_pin,recover_account_pin,export_account_backup,restore_account_backup,lock_account])
+ }).invoke_handler(tauri::generate_handler![load_role_workspace,role_exchange,list_role_drafts,save_role_draft,sync_role_draft,list_games,launch_game,stop_game,core_status,open_registration_page,account_status,register_account,unlock_account,change_account_pin,recover_account_pin,export_account_backup,restore_account_backup,lock_account])
  .run(tauri::generate_context!()).expect("failed to run ThinkGrow offline app");
 }

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-load-role-workspace"
+description = "Enables the load_role_workspace command without any pre-configured scope."
+commands.allow = ["load_role_workspace"]
+
+[[permission]]
+identifier = "deny-load-role-workspace"
+description = "Denies the load_role_workspace command without any pre-configured scope."
+commands.deny = ["load_role_workspace"]

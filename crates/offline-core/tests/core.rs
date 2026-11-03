@@ -4,6 +4,79 @@ use tempfile::TempDir;
 use uuid::Uuid;
 use rusqlite::Connection;
 const NOW:i64=20_000;
+
+fn role_signed(f:&Fixture,app:App,action:&str,data:serde_json::Value)->Signed {
+ let payload=serde_json::to_string(&workspace::RoleReply{protocol:1,app_id:app.id().into(),subject_id:"actor".into(),device_id:"device".into(),credential_epoch:1,issued_ms:NOW,expires_ms:WEEK_MS,request_id:"11111111-1111-4111-8111-111111111111".into(),action:action.into(),data}).unwrap();
+ Signed{key_id:"issuer".into(),signature:crypto::sign(&f.issuer,"thinkgrow.role-reply.v1",payload.as_bytes()),payload}
+}
+fn teacher_workspace()->serde_json::Value {serde_json::json!({"role":"teacher","selected":{"evaluation_mode":"score","rubrics":[{"id":"r1","max_score":5}],"submissions":[{"answer_version_id":"answer-v1","base_grading_revision":"legacy","body":"PRIVATE-ROSTER-MARKER"}]}})}
+fn grading()->serde_json::Value {serde_json::json!({"answer_version_id":"answer-v1","base_grading_revision":"legacy","scores":{"r1":4},"feedback":"Helpful feedback","level":null,"confirm":true})}
+fn teacher_store(f:&Fixture)->Store{let mut s=f.open(App::Teacher);s.install_grant(&f.signed(&f.grant(App::Teacher,1)),NOW).unwrap();s}
+#[test]fn role_signature_partition_expiry_and_grade_cas(){
+ let f=Fixture::new();let s=teacher_store(&f);let signed=role_signed(&f,App::Teacher,"workspace",teacher_workspace());
+ s.accept_role_reply(&signed,"workspace","11111111-1111-4111-8111-111111111111",NOW).unwrap();
+ let d=s.save_role_draft("grade",grading(),0,NOW).unwrap();assert_eq!(d.revision,1);
+ assert!(matches!(s.save_role_draft("grade",grading(),0,NOW),Err(Error::Conflict)));
+ let mut invalid=grading();invalid["scores"]["r1"]=6.into();assert!(s.save_role_draft("grade",invalid,1,NOW).is_err());
+ let parent=f.open(App::Parent);assert!(parent.verify_role_reply(&signed).is_err());
+ let mut tampered=signed.clone();tampered.payload.push(' ');assert!(s.verify_role_reply(&tampered).is_err());
+ for path in ["role.sqlite3","role.sqlite3-wal"]{if let Ok(bytes)=std::fs::read(s.storage_path().join(path)){assert!(!bytes.windows(21).any(|w|w==b"PRIVATE-ROSTER-MARKER"));}}
+ let request=s.role_request("grade",d.data.clone(),&d.operation_id,NOW).unwrap();let request:serde_json::Value=serde_json::from_slice(&request).unwrap();crypto::verify(&f.device.verifying_key().to_bytes(),"thinkgrow.role-request.v1",request["payload"].as_str().unwrap().as_bytes(),request["proof"].as_str().unwrap()).unwrap();
+ assert!(s.save_role_draft("grade",grading(),1,WEEK_MS+1001).is_err());assert!(s.role_request("grade",grading(),&d.operation_id,NOW).is_err());assert!(s.role_workspace().unwrap().is_some());
+ assert!(s.accept_role_reply(&signed,"grade",&d.operation_id,NOW).is_err());
+}
+#[test]fn parent_reply_is_bound_to_approved_link_revision(){
+ let f=Fixture::new();let mut s=f.open(App::Parent);s.install_grant(&f.signed(&f.grant(App::Parent,1)),NOW).unwrap();
+ let signed=role_signed(&f,App::Parent,"workspace",serde_json::json!({"role":"parent","inbox":[{"id":"link-a","link_revision":3}]}));
+ s.accept_role_reply(&signed,"workspace","11111111-1111-4111-8111-111111111111",NOW).unwrap();
+ let data=serde_json::json!({"link_id":"link-a","link_revision":3,"body":"회신 초안"});
+ assert!(s.save_role_draft("grade",grading(),0,NOW).is_err());let d=s.save_role_draft("parent_reply",data.clone(),0,NOW).unwrap();
+ let mut stale=data;stale["link_revision"]=2.into();assert!(s.save_role_draft("parent_reply",stale,1,NOW).is_err());
+ drop(s);let reopened=f.open(App::Parent);assert_eq!(reopened.role_drafts().unwrap()[0].data,d.data);
+}
+fn game_data()->serde_json::Value{let bytes=b"<html><body>Approved synthetic game</body></html>";serde_json::json!({"game":{"id":"game-a","title":"Test game","version":"1.0.0","runtime":"static","host_api":1,"entry":"index.html","source_sha256":"a".repeat(64),"files":{"index.html":{"data":crypto::b64(bytes),"sha256":crypto::hash(bytes)}}}})}
+#[cfg(windows)]
+#[test]fn game_loopback_host_rejects_wrong_origin_and_preserves_events(){
+ use std::sync::Arc;use runtime::{NativeContext,NativeAccount};
+ let f=Fixture::new();let current=runtime::now();let mut grant=f.grant(App::Teacher,1);grant.issued_ms=current-1000;grant.expires_ms=current+60000;
+ let context=Arc::new(NativeContext::new(f.dir.path().to_path_buf(),App::Teacher));
+ context.attach_registered_account(NativeAccount{subject:"actor".into(),device:"device".into(),data_key:DataKey::new([2;32]),device_signer:f.device.clone()},f.trust(),Some(&f.signed(&grant)),current,Some(current)).unwrap();
+ context.role_exchange("install_game",serde_json::json!({"game_id":"game-a"}),|request|{
+  let request:serde_json::Value=serde_json::from_slice(request).unwrap();let payload:serde_json::Value=serde_json::from_str(request["payload"].as_str().unwrap()).unwrap();
+  let mut signed=role_signed(&f,App::Teacher,"install_game",game_data());let mut reply:workspace::RoleReply=serde_json::from_str(&signed.payload).unwrap();reply.request_id=payload["request_id"].as_str().unwrap().into();reply.issued_ms=current;reply.expires_ms=grant.expires_ms;
+  signed.payload=serde_json::to_string(&reply).unwrap();signed.signature=crypto::sign(&f.issuer,"thinkgrow.role-reply.v1",signed.payload.as_bytes());Ok(signed)
+ }).unwrap();
+ let launch=context.launch_game("game-a").unwrap();let client=reqwest::blocking::Client::new();
+ let page=client.get(&launch.url).send().unwrap();assert_eq!(page.status(),200);assert!(page.headers()["content-security-policy"].to_str().unwrap().contains("sandbox allow-scripts allow-same-origin"));assert!(page.text().unwrap().contains("__host/sdk.js"));
+ let url=url::Url::parse(&launch.url).unwrap();let origin=url.origin().ascii_serialization();let base=launch.url.rsplit_once('/').unwrap().0;
+ let endpoint=format!("{base}/__host/events");let body=serde_json::json!({"sequence":1,"kind":"progress","data":{"step":1}});
+ assert_eq!(client.post(&endpoint).json(&body).send().unwrap().status(),403);
+ assert_eq!(client.post(&endpoint).header("Origin",&origin).json(&body).send().unwrap().status(),200);
+ assert_eq!(client.post(&endpoint).header("Origin",&origin).json(&body).send().unwrap().status(),200);
+ assert_eq!(context.game_run(&launch.run_id).unwrap().events.len(),1);
+ let replay=context.launch_game("game-a").unwrap();assert_eq!(client.get(&replay.url).send().unwrap().status(),200);
+ context.lock_account().unwrap();assert!(context.game_run(&launch.run_id).is_err());
+}
+#[test]fn game_install_pins_bytes_and_events_are_durable_deduplicated(){
+ let f=Fixture::new();let s=teacher_store(&f);assert!(s.installed_games().unwrap().is_empty());
+ let signed=role_signed(&f,App::Teacher,"install_game",game_data());s.accept_role_reply(&signed,"install_game","11111111-1111-4111-8111-111111111111",NOW).unwrap();
+ let (run,_)=s.start_game("game-a",NOW).unwrap();let event=serde_json::json!({"sequence":1,"kind":"checkpoint","data":{"round":2}});
+ s.game_event(&run.id,event.clone(),NOW).unwrap();s.game_event(&run.id,event.clone(),NOW).unwrap();
+ let mut conflict=event;conflict["data"]["round"]=3.into();assert!(s.game_event(&run.id,conflict,NOW).is_err());
+ assert_eq!(s.game_run(&run.id,NOW).unwrap().events.len(),1);assert_eq!(s.start_game("game-a",NOW).unwrap().0.checkpoint["round"],2);
+ let mut corrupt=game_data();corrupt["game"]["files"]["index.html"]["sha256"]="b".repeat(64).into();
+ let bad=role_signed(&f,App::Teacher,"install_game",corrupt);assert!(s.accept_role_reply(&bad,"install_game","11111111-1111-4111-8111-111111111111",NOW).is_err());
+ assert!(workspace::safe_game_path("assets/main.js"));for p in ["../keys","a/../b","/etc/passwd","%2e%2e/x","a\\b"]{assert!(!workspace::safe_game_path(p));}
+ drop(s);let reopened=f.open(App::Teacher);assert_eq!(reopened.game_run(&run.id,NOW).unwrap().events.len(),1);
+}
+#[test]fn student_games_require_the_exact_enrolled_assignment_and_content(){
+ let f=Fixture::new();let s=f.store();let request="11111111-1111-4111-8111-111111111111";
+ let game=role_signed(&f,App::Student,"install_game",game_data());s.accept_role_reply(&game,"install_game",request,NOW).unwrap();
+ let data=serde_json::json!({"role":"student","games":[{"id":"game-a","assignment_id":"assignment","source_sha256":"a".repeat(64)}]});
+ s.accept_role_reply(&role_signed(&f,App::Student,"workspace",data),"workspace",request,NOW).unwrap();
+ assert!(s.start_game("game-a",NOW).is_err());assert!(s.start_game_for("game-a",Some("foreign"),NOW).is_err());
+ let (run,_)=s.start_game_for("game-a",Some("assignment"),NOW).unwrap();assert_eq!(run.assignment_id.as_deref(),Some("assignment"));
+}
 struct Fixture {dir:TempDir,issuer:SigningKey,device:SigningKey,classroom:SigningKey,online:SigningKey}
 impl Fixture {
  fn new()->Self{Self{dir:tempfile::tempdir().unwrap(),issuer:SigningKey::from_bytes(&[7;32]),
