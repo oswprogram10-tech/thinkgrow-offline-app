@@ -1,0 +1,20 @@
+{
+  "name": "@thinkgrow/offline-parent",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "tauri": "node ../../scripts/tauri-mobile.mjs parent",
+    "dev": "tauri dev",
+    "build": "tauri android build",
+    "android:init": "node ../../scripts/tauri-mobile.mjs parent android init",
+    "android:dev": "node ../../scripts/tauri-mobile.mjs parent android dev",
+    "android:build": "node ../../scripts/tauri-mobile.mjs parent android build",
+    "ios:init": "tauri ios init",
+    "ios:dev": "tauri ios dev",
+    "ios:build": "tauri ios build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}

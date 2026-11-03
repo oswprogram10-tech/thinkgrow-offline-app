@@ -1,0 +1,10 @@
+{
+  "enabled": false,
+  "channel": "stable",
+  "catalog_url": null,
+  "catalog_signature_url": null,
+  "pinned_minisign_public_key": null,
+  "credential_issuer_keys": {},
+  "classroom_receipt_keys": {},
+  "online_receipt_keys": {}
+}

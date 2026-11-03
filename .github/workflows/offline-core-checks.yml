@@ -1,0 +1,42 @@
+name: Offline core checks
+on:
+  push:
+    paths: ['crates/**', 'apps/**', 'tools/release_bridge.py', 'tools/test_release_bridge.py', 'scripts/**', 'release/**', 'contracts/**', 'Cargo.*', '.github/workflows/**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    env:
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Locked npm dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal
+          rustup override set 1.99.1
+      - name: Build local role-specific UI assets
+        run: |
+          node scripts/build-ui.mjs teacher
+          node scripts/build-ui.mjs student
+          node scripts/build-ui.mjs parent
+      - name: Storage and transport regression checks
+        run: cargo test --locked -p thinkgrow-offline-core
+      - name: Native app command boundary compilation
+        run: cargo check --locked -p teacher -p student -p parent
+      - name: Release staging binary
+        run: cargo build --locked -p thinkgrow-offline-core --bin release-check
+      - name: Real Tauri signature and release bridge checks
+        run: python tools/test_release_bridge.py
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: release-bridge-evidence
+          path: docs/build-evidence/release-bridge-*.json

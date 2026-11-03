@@ -1,0 +1,16 @@
+[package]
+name = "tauri-plugin-thinkgrow-vault"
+version = "0.1.0"
+edition = "2021"
+links = "tauri-plugin-thinkgrow-vault"
+publish = false
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+thinkgrow-offline-core = { path = "../offline-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"

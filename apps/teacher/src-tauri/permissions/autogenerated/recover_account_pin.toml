@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-recover-account-pin"
+description = "Enables the recover_account_pin command without any pre-configured scope."
+commands.allow = ["recover_account_pin"]
+
+[[permission]]
+identifier = "deny-recover-account-pin"
+description = "Denies the recover_account_pin command without any pre-configured scope."
+commands.deny = ["recover_account_pin"]

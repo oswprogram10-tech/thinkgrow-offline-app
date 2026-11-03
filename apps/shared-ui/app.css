@@ -1,0 +1,23 @@
+:root{color-scheme:light;font-family:"Segoe UI","Malgun Gothic",sans-serif;color:#17212b;background:#f5f7f8}
+*{box-sizing:border-box}body{margin:0;padding:40px 24px;min-height:100vh}main{width:min(960px,100%);margin:auto;padding:40px;border:1px solid #dce3e7;border-radius:16px;background:#fff;box-shadow:0 16px 48px #17212b0d}
+header,.session-title{display:flex;justify-content:space-between;align-items:center;gap:16px}.eyebrow{color:#225d52;font-size:14px;font-weight:700;margin:0}.build-state{font-size:12px;background:#eef3f2;color:#42645e;padding:5px 10px;border-radius:6px}h1{margin:28px 0 16px;font-size:32px;letter-spacing:-.04em}h2{font-size:20px;margin:0 0 24px}p{line-height:1.65;word-break:keep-all;overflow-wrap:anywhere}.lead{color:#52616c;margin-bottom:28px}.notice{border:1px solid #dce3e7;border-radius:8px;background:#f5f7f8;padding:16px;margin:0 0 32px;min-height:60px;font-size:14px}.notice.error{border-color:#c55448;color:#8b2820;background:#fff6f4}.account-grid{display:grid;grid-template-columns:1fr 1fr;gap:48px}.account-grid section+section{border-left:1px solid #dce3e7;padding-left:40px}fieldset{border:0;padding:0;margin:0;min-width:0}label{display:block;font-size:14px;font-weight:600;margin-bottom:8px}input,select,button{font:inherit;min-height:44px;border-radius:8px}input,select{width:100%;background:#fff;border:1px solid #a9b6bf;padding:10px 12px;margin-bottom:20px;color:#17212b}button{border:1px solid #225d52;background:#225d52;color:white;padding:10px 20px;cursor:pointer}form button{width:100%;margin-top:4px}button:hover{background:#19473f}button:disabled,fieldset:disabled button{cursor:default;background:#e3e8e9;border-color:#dce3e7;color:#64737d}input:disabled,select:disabled,fieldset:disabled input,fieldset:disabled select{background:#f5f7f8;color:#64737d}:focus-visible{outline:3px solid #4266a8;outline-offset:3px}.hint,footer{font-size:13px;color:#62727e;line-height:1.7}.hint{margin:16px 0 0}footer{border-top:1px solid #dce3e7;padding-top:20px;margin-top:36px}.secondary{background:white;color:#225d52}.secondary:hover{background:#eef3f2}dl{display:grid;grid-template-columns:1fr auto;gap:12px;margin:24px 0}dt,dd{margin:0}dd{font-weight:700}[hidden]{display:none!important}
+@media(max-width:700px){body{padding:20px 12px}main{padding:26px 20px}.account-grid{grid-template-columns:1fr;gap:32px}.account-grid section+section{border-left:0;border-top:1px solid #dce3e7;padding:28px 0 0}h1{font-size:28px}.session-title{align-items:flex-start;flex-direction:column}}
+
+#get-code{width:100%;margin:0 0 24px}
+
+.lesson-toolbar,.answer-actions {display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.security-settings {border-top:1px solid #dce3e7;margin-top:24px;padding-top:16px}.security-settings summary {min-height:44px;display:flex;align-items:center;font-weight:700;cursor:pointer}.security-settings form {max-width:520px}.security-settings p {max-width:620px}
+.lesson-layout {display:grid;grid-template-columns:minmax(180px,1fr) minmax(0,3fr);gap:24px;margin-top:24px}
+#lesson-list {display:flex;flex-direction:column;gap:8px;align-items:stretch}
+#lesson-list button {text-align:left;white-space:normal;overflow-wrap:anywhere}
+#lesson-list button[aria-current="true"] {outline:2px solid #235941;outline-offset:2px}
+#lesson-editor {min-width:0;border-top:1px solid #dce3dd;padding-top:20px}
+.question-text {white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}
+#answer-controls textarea {width:100%;min-height:220px;resize:vertical;box-sizing:border-box;font:inherit;line-height:1.7;padding:14px;border:1px solid #87988b;border-radius:12px}
+.answer-choice {display:flex;gap:12px;align-items:center;min-height:48px;padding:8px;border-bottom:1px solid #dce3dd}
+.answer-choice input {width:20px;height:20px;margin:0;flex-shrink:0}
+.answer-choice label {margin:0;font-weight:400;overflow-wrap:anywhere}
+.order-row {display:flex;gap:8px;align-items:center;margin:8px 0}.order-row span {flex:1;overflow-wrap:anywhere}.order-row button {min-width:44px;padding:8px}
+#answer-controls select,#answer-controls input[type="text"] {margin-bottom:16px}
+#answer-state {min-height:24px}#lesson-notice.error,#answer-state.error {color:#9d251b}
+@media(max-width:700px){.lesson-layout{grid-template-columns:1fr}#lesson-list{display:grid;grid-template-columns:1fr}#lesson-editor{padding-top:16px}}

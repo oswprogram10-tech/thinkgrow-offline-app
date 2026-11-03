@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>생각쑥쑥 학부모</title><link rel="stylesheet" href="./app.css"><script src="./app.js" defer></script></head>
+<body data-role="parent"><main>
+ <header><p class="eyebrow">생각쑥쑥 · 학부모 전용 앱</p><span class="build-state">개발 중</span></header>
+ <h1>이 기기에서 시작하기</h1><p class="lead">계정마다 수업 자료를 따로 보관합니다.<br>사용을 마친 뒤에는 계정을 잠가 주세요.</p>
+ <p id="notice" class="notice" role="status" aria-live="polite">기기 상태를 확인하고 있습니다.</p>
+ <div id="account-forms" class="account-grid">
+  <section aria-labelledby="unlock-title"><h2 id="unlock-title">저장된 계정 열기</h2>
+   <form id="unlock-form"><fieldset disabled><label for="account">이 기기의 계정</label><select id="account" name="handle" required><option value="">등록된 계정이 없습니다</option></select>
+    <label for="unlock-pin">잠금 숫자코드</label><input id="unlock-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6,12}" minlength="6" maxlength="12" autocomplete="current-password" required>
+    <button type="submit">계정 열기</button></fieldset></form>
+   <p class="hint">6~12자리 숫자코드입니다. 잠그거나 자격이 만료되어도 작성한 자료는 지워지지 않습니다.</p>
+  </section>
+  <section aria-labelledby="registration-title"><h2 id="registration-title">기기 등록하기</h2>
+   <button id="get-code" type="button" class="secondary" disabled>온라인에서 등록 코드 받기</button>
+   <form id="register-form"><fieldset disabled>
+    <label for="pending">등록할 계정</label><select id="pending" name="pending"><option value="">새 계정</option></select>
+    <label for="label">이 기기에서 구분할 이름</label><input id="label" name="label" maxlength="80" autocomplete="nickname" required>
+    <label for="code">기기 등록 코드</label><input id="code" name="code" type="password" minlength="12" maxlength="256" autocomplete="one-time-code" spellcheck="false" required>
+    <label for="register-pin">잠금 숫자코드 설정</label><input id="register-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6,12}" minlength="6" maxlength="12" autocomplete="new-password" required>
+    <button type="submit">이 기기 등록</button></fieldset></form>
+   <p class="hint">온라인 계정으로 등록 코드를 받으세요. 전송이 끊겼다면 같은 계정을 선택해 다시 시도하세요.</p>
+  </section>
+ </div>
+ <details class="security-settings"><summary>PIN 분실 복구</summary><p class="hint">이전에 만든 보호 백업의 암호를 사용합니다. 이 기기에 저장된 계정의 PIN만 바꾸며 자료는 덮어쓰지 않습니다. 백업 암호를 잊었다면 복구할 수 없습니다.</p>
+  <form id="recover-pin-form"><fieldset disabled><label for="recovery-passphrase">보호 백업 암호</label><input id="recovery-passphrase" name="passphrase" type="password" minlength="12" maxlength="128" autocomplete="current-password" required>
+   <label for="recovery-pin">새 잠금 숫자코드</label><input id="recovery-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6,12}" minlength="6" maxlength="12" autocomplete="new-password" required>
+   <label for="recovery-pin-confirm">새 잠금 숫자코드 확인</label><input id="recovery-pin-confirm" name="pinConfirm" type="password" inputmode="numeric" pattern="[0-9]{6,12}" minlength="6" maxlength="12" autocomplete="new-password" required>
+   <button type="submit">PIN 복구</button></fieldset></form></details>
+ <details class="security-settings"><summary>보호 백업 복원</summary><p class="hint">다른 기기에서 암호화 백업을 선택하고 백업 암호와 새 PIN을 입력합니다. 복원 계정은 같은 기기 ID·키를 유지하므로 온라인 등록 코드를 받아 새 epoch로 갱신하세요. 서버가 epoch를 확인하는 요청은 이전 자격을 거부하며, 이전 설치는 오프라인 동안 계속 사용할 수 있습니다.</p>
+  <form id="restore-backup-form"><fieldset disabled><label for="backup-file">ThinkGrow 백업 파일</label><input id="backup-file" name="backupFile" type="file" accept=".tgbak,application/octet-stream" required>
+   <label for="restore-passphrase">백업 암호</label><input id="restore-passphrase" name="passphrase" type="password" minlength="12" maxlength="128" autocomplete="current-password" required>
+   <label for="restore-pin">복원할 계정의 새 잠금 숫자코드</label><input id="restore-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6,12}" minlength="6" maxlength="12" autocomplete="new-password" required>
+   <label for="restore-pin-confirm">새 잠금 숫자코드 확인</label><input id="restore-pin-confirm" name="pinConfirm" type="password" inputmode="numeric" pattern="[0-9]{6,12}" minlength="6" maxlength="12" autocomplete="new-password" required>
+   <button type="submit">백업 복원</button></fieldset></form>
+  <p class="hint">학부모 기기 설정·수업 자료·첨부를 포함합니다. 현재 백업 크기 제한은 32 MiB입니다. 암호는 백업 복원과 PIN 분실 복구에 모두 필요합니다.</p>
+ </details>
+ <section id="workspace" hidden aria-labelledby="workspace-title"><div class="session-title"><h2 id="workspace-title">기기 보관함</h2><button id="lock" type="button" class="secondary">계정 잠그기</button></div>
+  <p id="access-state"></p><dl id="local-summary"></dl>
+  <details class="security-settings"><summary>잠금 숫자코드 변경</summary><p class="hint">현재 숫자코드를 확인한 뒤 새 코드를 저장합니다. 변경 후에는 계정이 잠기며 보관 자료는 그대로 유지됩니다.</p>
+   <form id="change-pin-form"><fieldset disabled><label for="current-pin">현재 숫자코드</label><input id="current-pin" name="currentPin" type="password" inputmode="numeric" pattern="[0-9]{6,12}" minlength="6" maxlength="12" autocomplete="current-password" required>
+    <label for="new-pin">새 숫자코드</label><input id="new-pin" name="newPin" type="password" inputmode="numeric" pattern="[0-9]{6,12}" minlength="6" maxlength="12" autocomplete="new-password" required>
+    <label for="confirm-pin">새 숫자코드 확인</label><input id="confirm-pin" name="confirmPin" type="password" inputmode="numeric" pattern="[0-9]{6,12}" minlength="6" maxlength="12" autocomplete="new-password" required>
+    <button type="submit">숫자코드 변경</button></fieldset></form>
+  </details>
+  <details class="security-settings"><summary>보호 백업 만들기</summary><p class="hint">현재 PIN을 확인한 뒤 백업 암호로 전체 계정 보관 파일을 암호화합니다. 암호는 이 기기에서 PIN 분실 복구에도 쓰이므로 백업 파일과 함께 안전하게 보관하세요.</p>
+   <form id="export-backup-form"><fieldset disabled><label for="backup-current-pin">현재 잠금 숫자코드</label><input id="backup-current-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6,12}" minlength="6" maxlength="12" autocomplete="current-password" required>
+    <label for="backup-passphrase">백업 암호 (12자 이상)</label><input id="backup-passphrase" name="passphrase" type="password" minlength="12" maxlength="128" autocomplete="new-password" required>
+    <label for="backup-passphrase-confirm">백업 암호 확인</label><input id="backup-passphrase-confirm" name="passphraseConfirm" type="password" minlength="12" maxlength="128" autocomplete="new-password" required>
+    <button type="submit">암호화 백업 저장</button></fieldset></form>
+  </details>
+  <p class="hint">수업 자료 준비와 역할별 수업 화면은 구현 중입니다. 이 개발판에서는 배포 준비 상태와 계정 보관함까지만 연결되어 있습니다.</p>
+ </section>
+ <footer>기본 제공 게임은 없습니다. 게임은 마켓플레이스에서 개별 설치하는 방식으로 제공됩니다.</footer>
+</main></body></html>

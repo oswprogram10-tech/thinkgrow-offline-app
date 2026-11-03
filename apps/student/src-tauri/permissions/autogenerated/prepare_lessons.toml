@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-prepare-lessons"
+description = "Enables the prepare_lessons command without any pre-configured scope."
+commands.allow = ["prepare_lessons"]
+
+[[permission]]
+identifier = "deny-prepare-lessons"
+description = "Denies the prepare_lessons command without any pre-configured scope."
+commands.deny = ["prepare_lessons"]

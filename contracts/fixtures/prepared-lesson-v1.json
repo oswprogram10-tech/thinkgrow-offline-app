@@ -1,0 +1,10 @@
+{
+  "format": 1,
+  "synthetic_only": true,
+  "issuer_public_key": "XkSa1vpLLWV0bozU+WjjjFqWefhJXbEU7gYxf3L3F9s=",
+  "signed_lesson": {
+    "key_id": "synthetic-offline-issuer",
+    "payload": "{\"protocol\":1,\"app_id\":\"com.thinkgrow.offline.student\",\"subject_id\":\"student-a\",\"device_id\":\"c5226b5f-ab50-49eb-835e-512c98a66c6a\",\"credential_epoch\":1,\"issued_ms\":1793658926576,\"expires_ms\":1794263726570,\"package_revision\":\"9d908b9eb9334e443caa9603913ac53e22118831c3b840bdb45fda5fef957609\",\"school_id\":\"school-a\",\"class_id\":\"class-a\",\"assignment_id\":\"assignment-a\",\"title\":\"Public title\",\"prompt\":\"PUBLIC-LESSON-MARKER\",\"hint\":\"hint\",\"content\":{\"kind\":\"essay\",\"min_length\":0,\"max_length\":100000},\"starts_ms\":null,\"due_ms\":null,\"allow_late\":false}",
+    "signature": "p3oR9veXXn8EnCrFRTmhLbGBMYFpyESYZOxKmN60Yn2RVb2V5JwhZxajETLpdE9lwXs4IdJaIEzpp+ozlH9KAw=="
+  }
+}

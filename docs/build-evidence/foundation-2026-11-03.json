@@ -1,0 +1,330 @@
+{
+  "started_utc": "2026-11-02T19:17:33.607999+00:00",
+  "run_id": "2f50d041c21745deb819e6d42a44076b",
+  "scope": "Windows host native probes and updater transaction model",
+  "physical_devices": false,
+  "school_lan": false,
+  "production_deployment": false,
+  "checks": [
+    {
+      "name": "sqlite.before-commit.1",
+      "status": "passed",
+      "seconds": 0.11,
+      "details": {
+        "draft": "preserve-me",
+        "integrity": "ok",
+        "migration_column": 0,
+        "outbox": 1,
+        "schema": 1
+      }
+    },
+    {
+      "name": "sqlite.before-commit.2",
+      "status": "passed",
+      "seconds": 0.093,
+      "details": {
+        "draft": "preserve-me",
+        "integrity": "ok",
+        "migration_column": 0,
+        "outbox": 1,
+        "schema": 1
+      }
+    },
+    {
+      "name": "sqlite.before-commit.3",
+      "status": "passed",
+      "seconds": 0.094,
+      "details": {
+        "draft": "preserve-me",
+        "integrity": "ok",
+        "migration_column": 0,
+        "outbox": 1,
+        "schema": 1
+      }
+    },
+    {
+      "name": "sqlite.after-commit.1",
+      "status": "passed",
+      "seconds": 0.14,
+      "details": {
+        "draft": "changed-in-transaction",
+        "integrity": "ok",
+        "migration_column": 0,
+        "outbox": 2,
+        "schema": 1
+      }
+    },
+    {
+      "name": "sqlite.after-commit.2",
+      "status": "passed",
+      "seconds": 0.141,
+      "details": {
+        "draft": "changed-in-transaction",
+        "integrity": "ok",
+        "migration_column": 0,
+        "outbox": 2,
+        "schema": 1
+      }
+    },
+    {
+      "name": "sqlite.after-commit.3",
+      "status": "passed",
+      "seconds": 0.14,
+      "details": {
+        "draft": "changed-in-transaction",
+        "integrity": "ok",
+        "migration_column": 0,
+        "outbox": 2,
+        "schema": 1
+      }
+    },
+    {
+      "name": "sqlite.failed-migration-rollback",
+      "status": "passed",
+      "seconds": 0.063,
+      "details": {
+        "draft": "changed-in-transaction",
+        "integrity": "ok",
+        "migration_column": 0,
+        "outbox": 2,
+        "schema": 1
+      }
+    },
+    {
+      "name": "sqlite.corruption-detected-backup-restored",
+      "status": "passed",
+      "seconds": 0.094,
+      "details": {
+        "draft": "changed-in-transaction",
+        "integrity": "ok",
+        "migration_column": 0,
+        "outbox": 2,
+        "schema": 1
+      }
+    },
+    {
+      "name": "credentials.persist-and-namespace",
+      "status": "passed",
+      "seconds": 0.047,
+      "details": {
+        "backend": "Windows Credential Manager",
+        "cross_process": true,
+        "namespaces": 3
+      }
+    },
+    {
+      "name": "credentials.rotate",
+      "status": "passed",
+      "seconds": 0.047,
+      "details": {
+        "rotated": true,
+        "plaintext_logged": false
+      }
+    },
+    {
+      "name": "credentials.delete",
+      "status": "passed",
+      "seconds": 0.046,
+      "details": {
+        "synthetic_credentials_removed": 3
+      }
+    },
+    {
+      "name": "tls.trusted-ca-and-hostname",
+      "status": "passed",
+      "seconds": 0.093,
+      "details": {
+        "id": "baseline",
+        "receipt": "receipt-baseline"
+      }
+    },
+    {
+      "name": "tls.untrusted-ca-rejected",
+      "status": "passed",
+      "seconds": 0.094,
+      "details": {
+        "rejected": true,
+        "error": "인증서 체인은 처리되었지만, 신뢰 공급자에 의해 신뢰되지 않는 루트 인증서에서 중지되었습니다. (os error -2146762487)"
+      }
+    },
+    {
+      "name": "tls.hostname-mismatch-rejected",
+      "status": "passed",
+      "seconds": 0.063,
+      "details": {
+        "rejected": true,
+        "error": "인증서의 CN 이름이 전달된 값과 일치하지 않습니다. (os error -2146762481)"
+      }
+    },
+    {
+      "name": "ws.invalid-token-rejected",
+      "status": "passed",
+      "seconds": 0.062,
+      "details": {
+        "rejected": true,
+        "error": "No authorized acknowledgement"
+      }
+    },
+    {
+      "name": "ws.wrong-role-rejected",
+      "status": "passed",
+      "seconds": 0.078,
+      "details": {
+        "rejected": true,
+        "error": "No authorized acknowledgement"
+      }
+    },
+    {
+      "name": "ws.disconnect-reconnect-deduplicate",
+      "status": "passed",
+      "seconds": 0.219,
+      "details": {
+        "lost_ack_rejected": true,
+        "receipt_reused": true
+      }
+    },
+    {
+      "name": "ws.same-id-different-payload-rejected",
+      "status": "passed",
+      "seconds": 0.062,
+      "details": {
+        "rejected": true,
+        "error": "No authorized acknowledgement"
+      }
+    },
+    {
+      "name": "ws.thirty-virtual-clients",
+      "status": "passed",
+      "seconds": 0.813,
+      "details": {
+        "virtual_clients": 30,
+        "unique_receipts": 30,
+        "loopback_only": true
+      }
+    },
+    {
+      "name": "tls.expired-certificate-rejected",
+      "status": "passed",
+      "seconds": 0.062,
+      "details": {
+        "rejected": true,
+        "error": "현재 시스템 시간을 검증하거나 서명된 파일의 스탬프를 검증하는데 필요한 인증서가 유효 기간 내에 있지 않습니다. (os error -2146762495)"
+      }
+    },
+    {
+      "name": "update.tauri-signature-compatible",
+      "status": "passed",
+      "seconds": 0.031,
+      "details": {
+        "verified": true
+      }
+    },
+    {
+      "name": "update.payload-tamper-rejected",
+      "status": "passed",
+      "seconds": 0.032,
+      "details": {
+        "rejected": true
+      }
+    },
+    {
+      "name": "update.wrong-key-rejected",
+      "status": "passed",
+      "seconds": 0.031,
+      "details": {
+        "rejected": true
+      }
+    },
+    {
+      "name": "update.wrong-role-blocked",
+      "status": "passed",
+      "seconds": 0.016,
+      "details": {
+        "rejected": true,
+        "active_unchanged": true
+      }
+    },
+    {
+      "name": "update.downgrade-blocked",
+      "status": "passed",
+      "seconds": 0.015,
+      "details": {
+        "rejected": true,
+        "active_unchanged": true
+      }
+    },
+    {
+      "name": "update.replay-blocked",
+      "status": "passed",
+      "seconds": 0.016,
+      "details": {
+        "rejected": true,
+        "active_unchanged": true
+      }
+    },
+    {
+      "name": "update.during-class-blocked",
+      "status": "passed",
+      "seconds": 0.031,
+      "details": {
+        "rejected": true,
+        "active_unchanged": true
+      }
+    },
+    {
+      "name": "update.without-consent-blocked",
+      "status": "passed",
+      "seconds": 0.016,
+      "details": {
+        "rejected": true,
+        "active_unchanged": true
+      }
+    },
+    {
+      "name": "update.crash-before-switch",
+      "status": "passed",
+      "seconds": 0.313,
+      "details": {
+        "restored": "1.0.0",
+        "data_preserved": true
+      }
+    },
+    {
+      "name": "update.crash-after-switch",
+      "status": "passed",
+      "seconds": 0.281,
+      "details": {
+        "restored": "1.0.0",
+        "data_preserved": true
+      }
+    },
+    {
+      "name": "update.failed-health-rollback",
+      "status": "passed",
+      "seconds": 0.031,
+      "details": {
+        "restored": "1.0.0",
+        "data_preserved": true
+      }
+    },
+    {
+      "name": "update.healthy-activation-model",
+      "status": "passed",
+      "seconds": 0.016,
+      "details": {
+        "active": "2.0.0",
+        "data_preserved": true,
+        "installer_model_only": true
+      }
+    }
+  ],
+  "sqlite_version": "3.54.1",
+  "transport": {
+    "listener": "127.0.0.1 only",
+    "client_tls": "Rust native-tls / Windows SChannel",
+    "server": "Python ssl test fixture"
+  },
+  "status": "passed",
+  "finished_utc": "2026-11-02T19:17:39.243442+00:00",
+  "passed_checks": 32
+}

@@ -1,0 +1,11 @@
+{
+  "format": 1,
+  "online_repository": "oswprogram10-tech/school-class-allinone-platform",
+  "base_commit": "088bdec4031a18fc91e18a3130ca10cf97bde198",
+  "online_commit": "088bdec4031a18fc91e18a3130ca10cf97bde198",
+  "changes": [],
+  "native_rebuild_required": false,
+  "game_release_required": false,
+  "automatic_publish_allowed": false,
+  "note": "Review/adapt shared and online-only changes, then build pinned offline sources and sign release artifacts."
+}

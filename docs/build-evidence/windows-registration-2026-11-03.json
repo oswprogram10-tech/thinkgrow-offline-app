@@ -1,0 +1,106 @@
+{
+  "date_kst": "2026-11-03",
+  "production_deployed": false,
+  "application_files_published": false,
+  "windows_native_compile": [
+    "teacher",
+    "student",
+    "parent-library-only"
+  ],
+  "checks": {
+    "core": 32,
+    "release_bridge": 12,
+    "synthetic_ui": 6,
+    "server_enrollment": 11,
+    "server_foundation_regression": 15,
+    "server_build_source": 4
+  },
+  "total_passed": 80,
+  "windows_application_ui_executed": false,
+  "real_installer_executed": false,
+  "windows_dpapi_exercised": true,
+  "mobile_vault_implemented": false,
+  "operational_issuer_configured": false,
+  "package_manifest": "release-output/windows-development-20261103-r2/build-manifest.json",
+  "packages": [
+    {
+      "role": "teacher",
+      "app_id": "com.thinkgrow.offline.teacher",
+      "platform": "windows-x86_64",
+      "version": "0.1.0",
+      "package_type": "installer",
+      "file": "thinkgrow-teacher-0.1.0-windows-x64-setup.exe",
+      "bytes": 221017288,
+      "sha256": "75c45e26af9e449fea49b4785f04707b610663b6970f1cd4a56c9e203011ae1e"
+    },
+    {
+      "role": "teacher",
+      "app_id": "com.thinkgrow.offline.teacher",
+      "platform": "windows-x86_64",
+      "version": "0.1.0",
+      "package_type": "portable",
+      "file": "thinkgrow-teacher-0.1.0-windows-x64-standalone.zip",
+      "bytes": 4265465,
+      "sha256": "6045a175ebb55472c21d01ba8b375d4e8d9e58936bd81729f88feb9f3ecc81d3"
+    },
+    {
+      "role": "student",
+      "app_id": "com.thinkgrow.offline.student",
+      "platform": "windows-x86_64",
+      "version": "0.1.0",
+      "package_type": "installer",
+      "file": "thinkgrow-student-0.1.0-windows-x64-setup.exe",
+      "bytes": 221040852,
+      "sha256": "41bb0b0f69652922ec21f877d04dd96ce681199813aaa168699d726ecfb88e09"
+    },
+    {
+      "role": "student",
+      "app_id": "com.thinkgrow.offline.student",
+      "platform": "windows-x86_64",
+      "version": "0.1.0",
+      "package_type": "portable",
+      "file": "thinkgrow-student-0.1.0-windows-x64-standalone.zip",
+      "bytes": 4296847,
+      "sha256": "939f70efd6dcc566ab5b4f1a29f20669197780d0fc5d721ee07aad7f1aa4a484"
+    }
+  ],
+  "source_sha256": {
+    "Cargo.lock": "d2fe8543a100c674c8f79e9d48cfe8b4dbf8c3c92c84759cd3016d7859c77a33",
+    "release/native-policy.json": "14364e6db3b4116f68a36b81eed968ece442a8ab81776a1f4ea4db0319b26742",
+    "crates/offline-core/src/contract.rs": "a10f29085c8bcee114ea94ff0b02fed0ad4b88a7e9e06077799a95a5e1056d24",
+    "crates/offline-core/src/crypto.rs": "6e49908b9ab0ed3f2533cf3891c1af9a5afce73fcc63aebece4a5404fc8c457c",
+    "crates/offline-core/src/lib.rs": "f975a3f3d53e470e9421ac53e6fc578f8aa13852049c08069cfa9c678e5ad718",
+    "crates/offline-core/src/registration.rs": "61ebcbdc658ce7d3d33cae0d546045012af119276794da3145fd2f6ceb54ee42",
+    "crates/offline-core/src/runtime.rs": "dc994f9e8eb34221b0e4baed679fa2c28c09a3b46e2d29af020211738256e106",
+    "crates/offline-core/src/store.rs": "7832c4da4863d21deaa500d0a798aafafa82478b171d48deb1dd39913e2ac760",
+    "crates/offline-core/src/transport.rs": "84f1ba022685d7c944a973d19ef2b6c3657698b9c45122b6a63041efd29d4e22",
+    "crates/offline-core/src/update.rs": "01bedf6b71c9a0e1e96d5d130f82b9d8e31a58b7c934c85ad808dbe9748761c9",
+    "crates/offline-core/src/vault.rs": "dc39e9a881eec4876f96d97de31b37373125a13fd271743bb5ee2f8a17773d59",
+    "crates/offline-core/src/bin/release-check.rs": "60dd045b9f6ca02c069647996e0d0f7a30e435987cd7fa59b7735c76dce401bb",
+    "apps/parent/src-tauri/src/lib.rs": "2025fb49ac86b66be6306e1a33da19f79339b645a5cfbf606395cfec146d409c",
+    "apps/parent/src-tauri/src/main.rs": "54b2c6154c24550814c1251931e73315bafd32b7d0d83babd80da5e8a16d9564",
+    "apps/student/src-tauri/src/lib.rs": "ab46f896b56a3c6f0fb9e9cd90bbd879ebf6a63ee38c1173afb94a3f0ea1ea08",
+    "apps/student/src-tauri/src/main.rs": "2a9adab923f0b37663cd7c4fe42d14d931c38e4cebffc829e631c016decfbad8",
+    "apps/teacher/src-tauri/src/lib.rs": "15385a95af62831905ba03f074dd04ab61efe088ee2681306a94e1244fc0d93e",
+    "apps/teacher/src-tauri/src/main.rs": "2c733290d5572456218c5846609364a138721c8d15bc3e897c0b34c60eb1a8fc",
+    "apps/parent/src-tauri/tauri.conf.json": "adb33693fd43923b8dbc8dafc92e10733301d0a7b91f4faba2f3b982a0964bf7",
+    "apps/student/src-tauri/tauri.conf.json": "c7bab973fbf1b99e5dd73ffa42ec4e28e46d47fe1ef8388b2f8197a0d1617ed5",
+    "apps/student/src-tauri/tauri.windows.conf.json": "8b5bcefd889d846d343b7ba8cfe15b87a192d3ae19f2d39fc0d1198f0978aa37",
+    "apps/teacher/src-tauri/tauri.conf.json": "5c28c1bb520c8b0109690ee5abb10c2d35b37fd334326edbe4c15e87d069a2fd",
+    "apps/teacher/src-tauri/tauri.windows.conf.json": "8b5bcefd889d846d343b7ba8cfe15b87a192d3ae19f2d39fc0d1198f0978aa37",
+    "apps/parent/ui/index.html": "73bc74d617dc819489714129c994545f4f427dca1cbdd55a76e2d4356217e5ee",
+    "apps/student/ui/index.html": "9c2aea5bc2d740c8046cedde55f041c60c1a920ca7d64e4b64529b9d1b9eac47",
+    "apps/teacher/ui/index.html": "4d25c9323f409d17f181b4a0978a85f456563c7bad838eeb8156604db3eeef89",
+    "apps/shared-ui/app.css": "32e04b742fe757bb50909f51ce68dd1f82ec0d8d8c17e3507c335d6e78fb4f81",
+    "apps/shared-ui/app.js": "b07aa3f0786076217e1e22e5fde7c5215e237e799be485a45f59107a69ca0ff1",
+    "installer/windows/installer.nsi": "30a162b3813b51976bc91f575cf3d4c9b39f6cb6b746e45573cdb77d6f3d8ce8",
+    "installer/windows/LICENSE.Tauri-MIT": "9dd42ea92cff2ede5cd477cbfcce051b2d0115c0ac7f368ee88cb545055dff1d",
+    "installer/windows/UPSTREAM.json": "a6b61247557ae9c392a358c1fba4caad006f57ddab5eb976b2495ecae6bee575"
+  },
+  "android_core_compile": {
+    "target": "aarch64-linux-android",
+    "exit_code": 0,
+    "apk_rebuilt": false,
+    "runtime_executed": false
+  }
+}

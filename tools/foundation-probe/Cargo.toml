@@ -1,0 +1,16 @@
+[package]
+name = "thinkgrow-foundation-probe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+[workspace]
+[dependencies]
+rusqlite = { version = "=0.41.1", features = ["bundled", "backup"] }
+keyring = { version = "=3.6.3", features = ["windows-native"] }
+native-tls = "0.2"
+tungstenite = { version = "=0.28.0", default-features = false, features = ["handshake"] }
+minisign-verify = "=0.2.4"
+serde_json = "1"
+sha2 = "0.10"
+[profile.dev]
+debug = 0

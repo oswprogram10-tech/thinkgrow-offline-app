@@ -1,0 +1,39 @@
+{
+  "fixture_only": true,
+  "issuer_public_key": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=",
+  "server_public_key": "Q6cucUQBdi32a2jCbfvfJoKq7J8kdOykYT5CSg+6/Tw=",
+  "credential": {
+    "key_id": "fixture-issuer",
+    "payload": "{\"protocol\":1,\"app_id\":\"com.thinkgrow.offline.student\",\"subject_id\":\"fixture-student\",\"device_id\":\"fixture-device\",\"device_public_key\":\"E5j2LG0aRXxRumpLXz29L2n8qTIWIY3ImX5Ba9F9k8o=\",\"epoch\":1,\"issued_ms\":1000,\"expires_ms\":604801000,\"scopes\":[{\"school_id\":\"fixture-school\",\"class_id\":\"fixture-class\",\"assignment_id\":\"fixture-assignment\"}]}",
+    "signature": "3m7bQPp0nZIiiAeMN0ubBSg2z1Pe8OdXi51YZh7R8JNpy0jY48isWTKyVYfLjPGtPnCXWru1+fpUQnEzZaEGDw=="
+  },
+  "envelope": {
+    "operation": {
+      "protocol": 1,
+      "operation_id": "9ceea412-dac9-4707-af98-926150b0611c",
+      "origin_device_id": "fixture-device",
+      "device_seq": 1,
+      "subject_id": "fixture-student",
+      "app_id": "com.thinkgrow.offline.student",
+      "credential_epoch": 1,
+      "kind": "submission",
+      "answer": {
+        "school_id": "fixture-school",
+        "class_id": "fixture-class",
+        "assignment_id": "fixture-assignment",
+        "package_revision": "package-1",
+        "base_answer_revision": 0,
+        "body": "한글 답안\n🙂 '문자열'",
+        "blobs": []
+      },
+      "draft_revision": 1,
+      "payload_hash": "d5315eccc89e87048b5f946832759e3b2d086ab945168261926c9e8be85a2099"
+    },
+    "proof": "zVI9C9sOgL1tdekAsKA60hfMEP0Qx5OeitG7cj0NP2b/a4wzGV8664YQWSrrPsOGl/XfWiMXQSlKSNeujlxkAw=="
+  },
+  "receipt": {
+    "key_id": "fixture-online",
+    "payload": "{\"protocol\":1,\"operation_id\":\"9ceea412-dac9-4707-af98-926150b0611c\",\"origin_device_id\":\"fixture-device\",\"subject_id\":\"fixture-student\",\"payload_hash\":\"d5315eccc89e87048b5f946832759e3b2d086ab945168261926c9e8be85a2099\",\"destination\":\"online\",\"receipt_id\":\"fixture-receipt\",\"server_received_ms\":20000}",
+    "signature": "L9Z4QBaIe0UOFdX9uh7cT8GGU6GnM2v5CBpCSIy0sHMRCk2kAmLHYr6NowvE6QmL9lOtVUvDIefR2KLq/2MbDg=="
+  }
+}

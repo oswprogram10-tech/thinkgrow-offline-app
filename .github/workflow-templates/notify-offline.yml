@@ -1,0 +1,27 @@
+# Install this template into the ONLINE repository after setting the destination and token.
+name: Notify offline release bridge
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  notify:
+    if: vars.OFFLINE_REPOSITORY != ''
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.OFFLINE_DISPATCH_TOKEN }}
+      OFFLINE_REPOSITORY: ${{ vars.OFFLINE_REPOSITORY }}
+      ONLINE_COMMIT: ${{ github.sha }}
+    steps:
+      - name: Prepare dispatch without executing repository code
+        run: |
+          python - <<'PY'
+          import json, os, re
+          repo=os.environ['OFFLINE_REPOSITORY']
+          if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+',repo): raise SystemExit('Invalid offline repository')
+          with open('dispatch.json','w') as f:
+              json.dump({'event_type':'thinkgrow-online-source-changed',
+                         'client_payload':{'online_commit':os.environ['ONLINE_COMMIT']}},f)
+          PY
+          gh api --method POST "repos/$OFFLINE_REPOSITORY/dispatches" --input dispatch.json

@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-03",
+  "windows_manifest": "release-output/windows-development-20261103-r3/build-manifest.json",
+  "status": "verified_unpublished",
+  "artifacts": 4,
+  "total_bytes": 451227866,
+  "hash_zip_pe_checked": true,
+  "student_commands_excluded_from_other_roles": true,
+  "core_checks": 43,
+  "server_checks": 31,
+  "student_ui_checks": 15,
+  "account_ui_checks": 6,
+  "registration_ui_checks": 9,
+  "ios_build_verified": false,
+  "actual_user_enrollment_tested": false,
+  "formal_release": false
+}

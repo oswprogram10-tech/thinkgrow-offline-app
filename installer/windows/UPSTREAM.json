@@ -1,0 +1,10 @@
+{
+  "cli_version": "2.12.4",
+  "source_url": "https://raw.githubusercontent.com/tauri-apps/tauri/tauri-cli-v2.12.4/crates/tauri-bundler/src/bundle/windows/nsis/installer.nsi",
+  "upstream_sha256": "d00089d3b1a2c4a30d7b6e098079100cb8f25e980f84d4515aca4597b95e967d",
+  "license": "MIT",
+  "changes": [
+    "Remove application-data deletion checkbox",
+    "Remove application-data deletion branch; keep installer/upgrade behavior"
+  ]
+}

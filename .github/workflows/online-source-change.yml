@@ -1,0 +1,46 @@
+name: Analyze online changes for offline release
+on:
+  repository_dispatch:
+    types: [thinkgrow-online-source-changed]
+  workflow_dispatch:
+    inputs:
+      online_commit:
+        description: Full reviewed online source commit SHA
+        required: true
+permissions:
+  contents: read
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate source identity
+        id: source
+        env:
+          MANUAL_COMMIT: ${{ inputs.online_commit }}
+        run: |
+          python - <<'PY'
+          import json, os, re
+          event=json.load(open(os.environ['GITHUB_EVENT_PATH']))
+          sha=os.environ.get('MANUAL_COMMIT') or event.get('client_payload',{}).get('online_commit','')
+          if not re.fullmatch('[a-fA-F0-9]{40}',sha): raise SystemExit('Full online commit required')
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f: f.write('commit='+sha+'\n')
+          PY
+      - uses: actions/checkout@v7.0.1
+        with:
+          repository: oswprogram10-tech/school-class-allinone-platform
+          ref: ${{ steps.source.outputs.commit }}
+          path: _online-source
+          fetch-depth: 0
+          persist-credentials: false
+          token: ${{ secrets.ONLINE_SOURCE_READ_TOKEN || github.token }}
+      - name: Generate explicit adaptation and release plan
+        env:
+          ONLINE_COMMIT: ${{ steps.source.outputs.commit }}
+        run: python tools/release_bridge.py plan --online-repo _online-source --head "$ONLINE_COMMIT" --output release-plan.json
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: online-to-offline-release-plan
+          path: release-plan.json

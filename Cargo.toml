@@ -1,0 +1,9 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/offline-core",
+  "crates/native-vault",
+  "apps/teacher/src-tauri",
+  "apps/student/src-tauri",
+  "apps/parent/src-tauri",
+]

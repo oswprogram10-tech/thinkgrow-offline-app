@@ -1,0 +1,37 @@
+{
+  "format": 1,
+  "online_repository": "oswprogram10-tech/school-class-allinone-platform",
+  "baseline_commit": "088bdec4031a18fc91e18a3130ca10cf97bde198",
+  "rules": [
+    {
+      "prefix": "docs/",
+      "action": "documentation"
+    },
+    {
+      "prefix": "게임_서버/",
+      "action": "game_module"
+    },
+    {
+      "prefix": "experiments/eduworld-3d-prototype/",
+      "action": "game_module"
+    },
+    {
+      "prefix": "cloud/question_types.py",
+      "action": "shared_rules_and_native_rebuild"
+    },
+    {
+      "prefix": "cloud/",
+      "action": "offline_contract_review_and_native_rebuild"
+    },
+    {
+      "prefix": "서버/",
+      "action": "offline_contract_review_and_native_rebuild"
+    },
+    {
+      "prefix": "apps/",
+      "action": "offline_contract_review_and_native_rebuild"
+    }
+  ],
+  "default_action": "manual_review",
+  "install_policy": "outside_class_with_confirmation"
+}

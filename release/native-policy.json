@@ -1,0 +1,13 @@
+{
+  "format": 1,
+  "service_origin": "https://schoolclassscorecheck.web.app",
+  "credential_keys": {
+    "offline-credential-20261103": "AqeOTYCGJCqr2kW4D3jjDOwnZS3JsJu/hGoRnGIJPDY="
+  },
+  "credential_signing_key_ids": [
+    "offline-credential-20261103"
+  ],
+  "classroom_receipt_keys": {},
+  "online_receipt_keys": {},
+  "registration_enabled": true
+}

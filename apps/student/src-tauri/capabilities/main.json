@@ -1,0 +1,25 @@
+{
+  "identifier": "main-window",
+  "description": "Role-specific local account registration and lock commands; no filesystem, shell or arbitrary network permissions.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "allow-core-status",
+    "allow-load-draft",
+    "allow-save-draft",
+    "allow-queue-submission",
+    "allow-account-status",
+    "allow-register-account",
+    "allow-unlock-account",
+    "allow-change-account-pin",
+    "allow-recover-account-pin",
+    "allow-export-account-backup",
+    "allow-restore-account-backup",
+    "allow-lock-account",
+    "allow-open-registration-page",
+    "allow-list-lessons",
+    "allow-prepare-lessons"
+  ]
+}

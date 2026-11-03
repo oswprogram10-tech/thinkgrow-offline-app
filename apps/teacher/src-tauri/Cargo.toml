@@ -1,0 +1,21 @@
+[package]
+name = "teacher"
+version = "0.1.0"
+description = "생각쑥쑥 교사"
+authors = ["ThinkGrow"]
+edition = "2021"
+
+[lib]
+name = "thinkgrow_offline_teacher_lib"
+crate-type = ["rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+thinkgrow-offline-core = { path = "../../../crates/offline-core" }
+tauri = { version = "2", features = [] }
+
+tauri-plugin-opener = "2"
+
+tauri-plugin-thinkgrow-vault = { path = "../../../crates/native-vault" }

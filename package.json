@@ -1,0 +1,23 @@
+{
+  "name": "thinkgrow-offline-apps",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/teacher",
+    "apps/student",
+    "apps/parent"
+  ],
+  "scripts": {
+    "dev:teacher": "npm run dev --workspace @thinkgrow/offline-teacher",
+    "dev:student": "npm run dev --workspace @thinkgrow/offline-student",
+    "dev:parent": "npm run dev --workspace @thinkgrow/offline-parent",
+    "build:teacher": "npm run build --workspace @thinkgrow/offline-teacher",
+    "build:student": "npm run build --workspace @thinkgrow/offline-student",
+    "build:student:android": "npm run android:build --workspace @thinkgrow/offline-student --",
+    "build:student:ios": "npm run ios:build --workspace @thinkgrow/offline-student --",
+    "build:parent": "npm run build --workspace @thinkgrow/offline-parent",
+    "build:parent:android": "npm run android:build --workspace @thinkgrow/offline-parent --",
+    "build:parent:ios": "npm run ios:build --workspace @thinkgrow/offline-parent --",
+    "package:windows": "python tools/package_windows.py"
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "date": "2026-11-03",
+  "current": "release-output/windows-development-20261103-r3",
+  "removed_derived_files": [
+    {
+      "file": "release-output\\windows-development-20261103-r2\\build-manifest.json",
+      "bytes": 5137
+    },
+    {
+      "file": "release-output\\windows-development-20261103-r2\\student-build.log",
+      "bytes": 954
+    },
+    {
+      "file": "release-output\\windows-development-20261103-r2\\teacher-build.log",
+      "bytes": 954
+    },
+    {
+      "file": "release-output\\windows-development-20261103-r2\\thinkgrow-student-0.1.0-windows-x64-setup.exe",
+      "bytes": 221040852
+    },
+    {
+      "file": "release-output\\windows-development-20261103-r2\\thinkgrow-student-0.1.0-windows-x64-setup.exe.sha256",
+      "bytes": 113
+    },
+    {
+      "file": "release-output\\windows-development-20261103-r2\\thinkgrow-student-0.1.0-windows-x64-standalone.zip",
+      "bytes": 4296847
+    },
+    {
+      "file": "release-output\\windows-development-20261103-r2\\thinkgrow-student-0.1.0-windows-x64-standalone.zip.sha256",
+      "bytes": 118
+    },
+    {
+      "file": "release-output\\windows-development-20261103-r2\\thinkgrow-teacher-0.1.0-windows-x64-setup.exe",
+      "bytes": 221017288
+    },
+    {
+      "file": "release-output\\windows-development-20261103-r2\\thinkgrow-teacher-0.1.0-windows-x64-setup.exe.sha256",
+      "bytes": 113
+    },
+    {
+      "file": "release-output\\windows-development-20261103-r2\\thinkgrow-teacher-0.1.0-windows-x64-standalone.zip",
+      "bytes": 4265465
+    },
+    {
+      "file": "release-output\\windows-development-20261103-r2\\thinkgrow-teacher-0.1.0-windows-x64-standalone.zip.sha256",
+      "bytes": 118
+    },
+    {
+      "file": "target\\release\\bundle\\nsis\\생각쑥쑥 교사_0.1.0_x64-setup.exe",
+      "bytes": 221097182
+    },
+    {
+      "file": "target\\release\\bundle\\nsis\\생각쑥쑥 학생_0.1.0_x64-setup.exe",
+      "bytes": 221205170
+    }
+  ],
+  "bytes_reclaimed": 892930311,
+  "user_records_or_keys_removed": false
+}

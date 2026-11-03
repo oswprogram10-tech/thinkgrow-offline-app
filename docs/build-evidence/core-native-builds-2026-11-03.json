@@ -1,0 +1,85 @@
+{
+  "date_kst": "2026-11-03",
+  "core_protocol": 1,
+  "core_schema": 1,
+  "windows_release_exit": 0,
+  "android_debug_exit": 0,
+  "runtime_executed": false,
+  "production_deployment": false,
+  "artifacts": [
+    {
+      "role": "teacher",
+      "platform": "windows-x86_64",
+      "profile": "release",
+      "file": "target/release/teacher.exe",
+      "bytes": 10541056,
+      "sha256": "e7bc1299cc371d9daf6ae28e38c8a50d58f64dd4dc5a4c7486ad08443f003bae",
+      "permissions": [
+        "core:default",
+        "allow-core-status"
+      ]
+    },
+    {
+      "role": "student",
+      "platform": "windows-x86_64",
+      "profile": "release",
+      "file": "target/release/student.exe",
+      "bytes": 10800128,
+      "sha256": "f90e3e3af42966ef44be6bc1c20130809adbb28a8fac1d71bee04a91969d5962",
+      "permissions": [
+        "core:default",
+        "allow-core-status",
+        "allow-load-draft",
+        "allow-save-draft",
+        "allow-queue-submission"
+      ]
+    },
+    {
+      "role": "student",
+      "platform": "android-aarch64",
+      "profile": "debug",
+      "file": "apps/student/src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk",
+      "bytes": 273206144,
+      "sha256": "ab4f5cad0e7404f9e283e09cb750e7c4ed97dc6cf41f7780a336007299529bee",
+      "signature_verified": true,
+      "native_libraries": [
+        "lib/arm64-v8a/libthinkgrow_offline_student_lib.so"
+      ],
+      "badging": [
+        "package: name='com.thinkgrow.offline.student' versionCode='1000' versionName='0.1.0' platformBuildVersionName='17' platformBuildVersionCode='37' compileSdkVersion='37' compileSdkVersionCodename='17'",
+        "minSdkVersion:'24'",
+        "targetSdkVersion:'37'",
+        "native-code: 'arm64-v8a'"
+      ],
+      "permissions": [
+        "core:default",
+        "allow-core-status",
+        "allow-load-draft",
+        "allow-save-draft",
+        "allow-queue-submission"
+      ]
+    },
+    {
+      "role": "parent",
+      "platform": "android-aarch64",
+      "profile": "debug",
+      "file": "apps/parent/src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk",
+      "bytes": 272224679,
+      "sha256": "170ce4745557c5d616b9970b7f1f5eb6fa8af73be81090f2c1e7aeb3afd75649",
+      "signature_verified": true,
+      "native_libraries": [
+        "lib/arm64-v8a/libthinkgrow_offline_parent_lib.so"
+      ],
+      "badging": [
+        "package: name='com.thinkgrow.offline.parent' versionCode='1000' versionName='0.1.0' platformBuildVersionName='17' platformBuildVersionCode='37' compileSdkVersion='37' compileSdkVersionCodename='17'",
+        "minSdkVersion:'24'",
+        "targetSdkVersion:'37'",
+        "native-code: 'arm64-v8a'"
+      ],
+      "permissions": [
+        "core:default",
+        "allow-core-status"
+      ]
+    }
+  ]
+}
