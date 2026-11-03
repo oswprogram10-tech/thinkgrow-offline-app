@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-launch-material-app"
+description = "Enables the launch_material_app command without any pre-configured scope."
+commands.allow = ["launch_material_app"]
+
+[[permission]]
+identifier = "deny-launch-material-app"
+description = "Denies the launch_material_app command without any pre-configured scope."
+commands.deny = ["launch_material_app"]

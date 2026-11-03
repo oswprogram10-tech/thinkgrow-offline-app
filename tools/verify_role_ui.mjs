@@ -11,7 +11,7 @@ const edge=join(process.env['ProgramFiles(x86)']||'C:/Program Files (x86)','Micr
 const profile=mkdtempSync(join(tmpdir(),'thinkgrow-role-ui-'));let escapeRequests=0;
 const server=createServer((req,res)=>{
  if(req.url==='/escape'){escapeRequests++;res.end('unexpected');return;}
- const match=/^\/(teacher|student|parent)\/(index\.html|app\.css|app\.js|roles\.js|games\.js|student\.js)$/.exec(req.url);
+ const match=/^\/(teacher|student|parent)\/(index\.html|app\.css|app\.js|roles\.js|games\.js|materials\.js|student\.js)$/.exec(req.url);
  if(!match){res.writeHead(404);res.end();return;}
  res.setHeader('Content-Type',match[2].endsWith('.js')?'application/javascript':match[2].endsWith('.css')?'text/css':'text/html; charset=utf-8');res.end(readFileSync(join(root,'target/ui',match[1],match[2])));
 });await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;

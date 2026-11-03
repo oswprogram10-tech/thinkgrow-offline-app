@@ -5,6 +5,27 @@ use uuid::Uuid;
 use rusqlite::Connection;
 const NOW:i64=20_000;
 
+#[test]fn material_apps_require_the_enrolled_hash_and_a_separate_online_ticket(){
+ use base64::{Engine,engine::general_purpose::STANDARD};use std::io::Write;
+ fn archive(network:&str)->Vec<u8>{let mut out=std::io::Cursor::new(vec![]);{let mut z=zip::ZipWriter::new(&mut out);let opt=zip::write::SimpleFileOptions::default();z.start_file("thinkgrow.app.json",opt).unwrap();z.write_all(serde_json::json!({"name":"App","version":"1.0.0","host_api":1,"entry":"index.html","network":network,"allowed_origins":[]}).to_string().as_bytes()).unwrap();z.start_file("index.html",opt).unwrap();z.write_all(b"<h1>App</h1>").unwrap();z.finish().unwrap();}out.into_inner()}
+ let f=Fixture::new();let mut student=f.open(App::Student);student.install_grant(&f.signed(&f.grant(App::Student,1)),NOW).unwrap();
+ for (id,network) in [("mat-static","offline"),("mat-online","online")]{
+  let bytes=archive(network);let hash=crypto::hash(&bytes);
+  let info=MaterialInfo{id:id.into(),version:"1.0.0".into(),subtype:"app".into(),app_kind:Some("web_app".into()),title:"App".into(),filename:"app.zip".into(),size:bytes.len() as u64,sha256:hash.clone(),assignment_id:Some("assignment".into()),teacher_id:Some("teacher".into()),sync_at:NOW,offline_available:network=="offline"};
+  let chunk=MaterialChunk{material_id:id.into(),offset:0,length:bytes.len(),total_size:bytes.len() as u64,sha256:hash.clone(),filename:"app.zip".into(),chunk_data_b64:STANDARD.encode(&bytes)};
+  student.save_material_chunk(&chunk,&info).unwrap();assert!(student.start_material_app(id,None,NOW).is_err());
+  let data=serde_json::json!({"role":"student","materials":[{"id":id,"assignment_id":"assignment","source_sha256":hash}]});
+  student.accept_role_reply(&role_signed(&f,App::Student,"workspace",data),"workspace","11111111-1111-4111-8111-111111111111",NOW).unwrap();
+  if network=="offline"{let (run,_,_)=student.start_material_app(id,None,NOW).unwrap();assert!(student.game_run(&run.id,NOW).is_ok());}
+  else{
+   assert!(student.start_material_app(id,None,NOW).is_err());
+   let payload=serde_json::json!({"protocol":1,"game_id":id,"subject_id":"actor","device_id":"device","credential_epoch":1,"issued_ms":NOW,"expires_ms":NOW+60_000,"allowed_origins":[]}).to_string();
+   let signed=Signed{key_id:"issuer".into(),signature:crypto::sign(&f.issuer,"thinkgrow.material-session.v1",payload.as_bytes()),payload};
+   let token=serde_json::to_string(&signed).unwrap();assert!(student.start_material_app(id,Some(&token),NOW).is_ok());
+  }
+ }
+}
+
 fn role_signed(f:&Fixture,app:App,action:&str,data:serde_json::Value)->Signed {
  let payload=serde_json::to_string(&workspace::RoleReply{protocol:1,app_id:app.id().into(),subject_id:"actor".into(),device_id:"device".into(),credential_epoch:1,issued_ms:NOW,expires_ms:WEEK_MS,request_id:"11111111-1111-4111-8111-111111111111".into(),action:action.into(),data}).unwrap();
  Signed{key_id:"issuer".into(),signature:crypto::sign(&f.issuer,"thinkgrow.role-reply.v1",payload.as_bytes()),payload}
@@ -336,4 +357,53 @@ fn prepared_answer(l:&lesson::Lesson)->Answer{Answer{school_id:l.school_id.clone
  assert_eq!(fixture["synthetic_only"],true);let signed:Signed=serde_json::from_value(fixture["signed_lesson"].clone()).unwrap();
  let public:[u8;32]=crypto::decode(fixture["issuer_public_key"].as_str().unwrap()).unwrap().try_into().unwrap();
  let lesson:lesson::Lesson=signed.verify(&[(signed.key_id.clone(),public)].into(),"thinkgrow.lesson.v1").unwrap();lesson.validate().unwrap();assert_eq!(lesson.subject_id,"student-a");assert_eq!(lesson.prompt,"PUBLIC-LESSON-MARKER");assert!(!signed.payload.contains("PRIVATE-ANSWER"));
+}
+
+#[cfg(windows)]
+#[test]fn online_game_session_verification_and_scoped_origin_csp(){
+ use std::sync::Arc;use runtime::{NativeContext,NativeAccount};
+ let f=Fixture::new();let current=runtime::now();let mut grant=f.grant(App::Student,1);grant.issued_ms=current-1000;grant.expires_ms=current+60000;
+ let context=Arc::new(NativeContext::new(f.dir.path().to_path_buf(),App::Student));
+ context.attach_registered_account(NativeAccount{subject:"actor".into(),device:"device".into(),data_key:DataKey::new([2;32]),device_signer:f.device.clone()},f.trust(),Some(&f.signed(&grant)),current,Some(current)).unwrap();
+ let mut online_game=game_data();online_game["game"]["network_mode"]=serde_json::json!("online_session");
+ context.role_exchange("install_game",serde_json::json!({"game_id":"game-a"}),|request|{
+  let request:serde_json::Value=serde_json::from_slice(request).unwrap();let payload:serde_json::Value=serde_json::from_str(request["payload"].as_str().unwrap()).unwrap();
+  let mut signed=role_signed(&f,App::Student,"install_game",online_game);let mut reply:workspace::RoleReply=serde_json::from_str(&signed.payload).unwrap();reply.request_id=payload["request_id"].as_str().unwrap().into();reply.issued_ms=current;reply.expires_ms=grant.expires_ms;
+  signed.payload=serde_json::to_string(&reply).unwrap();signed.signature=crypto::sign(&f.issuer,"thinkgrow.role-reply.v1",signed.payload.as_bytes());Ok(signed)
+ }).unwrap();
+ let workspace_data=serde_json::json!({"role":"student","games":[{"id":"game-a","assignment_id":"assignment","source_sha256":"a".repeat(64)}]});
+ context.role_exchange("workspace",serde_json::json!({}),|request|{
+  let request:serde_json::Value=serde_json::from_slice(request).unwrap();let payload:serde_json::Value=serde_json::from_str(request["payload"].as_str().unwrap()).unwrap();
+  let mut signed=role_signed(&f,App::Student,"workspace",workspace_data);let mut reply:workspace::RoleReply=serde_json::from_str(&signed.payload).unwrap();reply.request_id=payload["request_id"].as_str().unwrap().into();reply.issued_ms=current;reply.expires_ms=grant.expires_ms;
+  signed.payload=serde_json::to_string(&reply).unwrap();signed.signature=crypto::sign(&f.issuer,"thinkgrow.role-reply.v1",signed.payload.as_bytes());Ok(signed)
+ }).unwrap();
+
+ assert!(context.launch_game_for("game-a",Some("assignment")).is_err());
+ assert!(context.launch_online_game_for("game-a",Some("assignment"),"").is_err());
+ assert!(context.launch_online_game_for("game-a",Some("assignment"),"fake-session").is_err());
+
+ let ticket_payload=serde_json::json!({
+  "protocol":1,"game_id":"game-a","device_id":"device","subject_id":"actor",
+  "credential_epoch":1,"issued_ms":current,"expires_ms":current+1800000,
+  "allowed_origins":["https://game.thinkgrow.kr","wss://game.thinkgrow.kr"]
+ });
+ let ticket_raw=serde_json::to_string(&ticket_payload).unwrap();
+ let ticket_sig=crypto::sign(&f.issuer,"thinkgrow.game-session.v1",ticket_raw.as_bytes());
+ let valid_token=serde_json::to_string(&serde_json::json!({
+  "key_id":"issuer","payload":ticket_raw,"signature":ticket_sig
+ })).unwrap();
+
+ let launch=context.launch_online_game_for("game-a",Some("assignment"),&valid_token).unwrap();
+ let client=reqwest::blocking::Client::new();
+ let page=client.get(&launch.url).send().unwrap();assert_eq!(page.status(),200);
+ let csp=page.headers()["content-security-policy"].to_str().unwrap();
+ assert!(csp.contains("connect-src 'self' https://game.thinkgrow.kr wss://game.thinkgrow.kr;"));
+ assert!(!csp.contains("https://*.web.app"));
+
+ let base=launch.url.rsplit_once('/').unwrap().0;
+ let ctx_url=format!("{base}/__host/context");
+ let ctx_res:serde_json::Value=client.get(&ctx_url).send().unwrap().json().unwrap();
+ assert_eq!(ctx_res["session_token"].as_str().unwrap(),valid_token);
+ assert_eq!(ctx_res["allowed_origins"][0].as_str().unwrap(),"https://game.thinkgrow.kr");
+ context.stop_game().unwrap();
 }

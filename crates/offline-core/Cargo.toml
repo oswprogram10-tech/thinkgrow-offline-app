@@ -21,6 +21,7 @@ semver = "1"
 url = "2"
 
 argon2 = { version = "=0.5.3", features = ["zeroize"] }
+zip = { version = "2.4.2", default-features = false, features = ["deflate"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_Storage_FileSystem"] }

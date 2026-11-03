@@ -1,0 +1,8 @@
+{
+  "tests_run": 12,
+  "failures": 0,
+  "errors": 0,
+  "status": "passed",
+  "published": false,
+  "fixtures": "temporary synthetic Git repositories, artifacts and Tauri signing keys"
+}

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-open-material-file"
+description = "Enables the open_material_file command without any pre-configured scope."
+commands.allow = ["open_material_file"]
+
+[[permission]]
+identifier = "deny-open-material-file"
+description = "Denies the open_material_file command without any pre-configured scope."
+commands.deny = ["open_material_file"]

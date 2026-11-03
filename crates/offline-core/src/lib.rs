@@ -12,6 +12,9 @@ pub use contract::*;
 pub use store::Store;
 pub use store::workspace;
 pub mod game_host;
+pub mod class_materials;
+pub mod material_app;
+pub use class_materials::{MaterialInfo, MaterialChunk};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

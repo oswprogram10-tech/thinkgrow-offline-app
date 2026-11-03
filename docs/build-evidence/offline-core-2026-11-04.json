@@ -1,0 +1,74 @@
+{
+  "date_kst": "2026-11-04",
+  "status": "passed",
+  "source_uncommitted": true,
+  "production_deployment": false,
+  "steps": [
+    {
+      "name": "teacher-ui-build",
+      "exit_code": 0,
+      "seconds": 0.235,
+      "log_sha256": "f386d169322759905192a10eea58c8991e208abf96e396e0e973015f376652c0"
+    },
+    {
+      "name": "student-ui-build",
+      "exit_code": 0,
+      "seconds": 0.109,
+      "log_sha256": "5bd9a119e8a0015849588eba39db44601079488cdfcd7ae3a47f6b9fca525423"
+    },
+    {
+      "name": "parent-ui-build",
+      "exit_code": 0,
+      "seconds": 0.11,
+      "log_sha256": "add4fd6837d049eaa16589e28d16ceb478a6e492269ec99901100559e50695f6"
+    },
+    {
+      "name": "core-tests",
+      "exit_code": 0,
+      "seconds": 17.343,
+      "log_sha256": "c14cd21f10e96b36185e81a5fe156fdfb8a3039583ae82441e1483780168b819",
+      "passed": 54
+    },
+    {
+      "name": "native-boundary-check",
+      "exit_code": 0,
+      "seconds": 3.063,
+      "log_sha256": "4e49fe19089b6610b860eb4b313b0141fcdcc402f4373e3c84f5a105bcdf68fb"
+    },
+    {
+      "name": "release-verifier-build",
+      "exit_code": 0,
+      "seconds": 1.375,
+      "log_sha256": "c2e7d8519ec607ff4f7a717e37299a6bac2a71e07e0cf7ee27d477eb6ef2cb46"
+    },
+    {
+      "name": "release-bridge-tests",
+      "exit_code": 0,
+      "seconds": 18.219,
+      "log_sha256": "a705a1bba063e04749e55eed39803db6779500c0d2af4b3f80bbba82bb9735b8"
+    }
+  ],
+  "release_bridge_tests": 12,
+  "source_sha256": {
+    "crates/offline-core/src/backup.rs": "acc2a1715a2dd6faa0b692a56a84ed29452d524024ee5746029aa4f972d186cc",
+    "crates/offline-core/src/class_materials.rs": "f892c00110beb382880bb87932c7b9e228c63ad51d129292bd8d6a8575c8b791",
+    "crates/offline-core/src/contract.rs": "fcc21a792af54d6d535151239668563c8c3527da56c7d03dd5ae4a15ee8196a8",
+    "crates/offline-core/src/crypto.rs": "d0637b6bdce2727c0dbd16bf72250099fc1efe57030ba7eb0d16c79d50ba02cb",
+    "crates/offline-core/src/game_host.rs": "bd20dd62b5d6f8a130ee67358a19db198abb19966d0b292e286af9f3bfa2a4e5",
+    "crates/offline-core/src/lesson.rs": "061cb1e4c32dd633d7924a3514e5521674e695173d893960932fd449c1ab1ff8",
+    "crates/offline-core/src/lesson_store.rs": "0a12f89a70f025718b9ad99202e2cb6e04d2fd1648c8a19626a927e4764b510c",
+    "crates/offline-core/src/lib.rs": "8a040f4552901f87d2d4b31b26e8473f8442094996ae1342e5b6ddfc353bbbad",
+    "crates/offline-core/src/registration.rs": "3fc4cba805138b1ecd238d22c49a6f8ae93bef9cbad36dfde3504e63d3aefd04",
+    "crates/offline-core/src/runtime.rs": "71a0180c684ee417d73ddccebe0a774ef7f476965c7caf02bc58449f61c59ee5",
+    "crates/offline-core/src/store.rs": "0c7baed12f5b8b86a42075858010544053a727ca5cc5fd6feab71306a175e31b",
+    "crates/offline-core/src/transport.rs": "84f1ba022685d7c944a973d19ef2b6c3657698b9c45122b6a63041efd29d4e22",
+    "crates/offline-core/src/update.rs": "01bedf6b71c9a0e1e96d5d130f82b9d8e31a58b7c934c85ad808dbe9748761c9",
+    "crates/offline-core/src/vault.rs": "959caef7d03fced0e67bee954a1e5d7810960d9759cbfa7348a752f746e983ea",
+    "crates/offline-core/src/workspace.rs": "31e600ea4549a2b4141fcc190d86c65996c0c790a7f67af9f357ea52e84b555a",
+    "crates/offline-core/src/bin/release-check.rs": "60dd045b9f6ca02c069647996e0d0f7a30e435987cd7fa59b7735c76dce401bb",
+    "crates/offline-core/tests/core.rs": "a8e8c62ab8df70eb2cda769aad95541929bbc4cd931a7b465299a2c168271cfa",
+    "crates/offline-core/src/schema.sql": "d8f5cb76430b7594dda25c7205d111df43a911541b91424dae93da76803a83a5",
+    "tools/release_bridge.py": "0f7f0882d6e7127e3216429098333528a227d4714cdde4379c6003d9556f70ad",
+    "Cargo.lock": "6695c8102a8f9c26ede9fc93310a8474a56261ebc763dcc5b94f79e5872f0582"
+  }
+}

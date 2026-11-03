@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-delete-material"
+description = "Enables the delete_material command without any pre-configured scope."
+commands.allow = ["delete_material"]
+
+[[permission]]
+identifier = "deny-delete-material"
+description = "Denies the delete_material command without any pre-configured scope."
+commands.deny = ["delete_material"]

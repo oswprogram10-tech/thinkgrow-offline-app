@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-save-material-chunk"
+description = "Enables the save_material_chunk command without any pre-configured scope."
+commands.allow = ["save_material_chunk"]
+
+[[permission]]
+identifier = "deny-save-material-chunk"
+description = "Denies the save_material_chunk command without any pre-configured scope."
+commands.deny = ["save_material_chunk"]

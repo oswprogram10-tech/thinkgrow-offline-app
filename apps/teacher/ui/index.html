@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>생각쑥쑥 교사</title><link rel="stylesheet" href="./app.css"><script src="./app.js" defer></script><script src="./roles.js" defer></script><script src="./games.js" defer></script></head>
+<title>생각쑥쑥 교사</title><link rel="stylesheet" href="./app.css"><script src="./app.js" defer></script><script src="./roles.js" defer></script><script src="./materials.js" defer></script><script src="./games.js" defer></script></head>
 <body data-role="teacher"><main>
  <header><p class="eyebrow">생각쑥쑥 · 교사 전용 앱</p><span class="build-state">개발 중</span></header>
  <h1>이 기기에서 시작하기</h1><p class="lead">계정마다 수업 자료를 따로 보관합니다.<br>사용을 마친 뒤에는 계정을 잠가 주세요.</p>
@@ -42,7 +42,14 @@
       <div class="lesson-toolbar"><h2 id="role-title">제출물 채점</h2><button type="button" id="role-refresh">온라인 자료 새로 받기</button></div>
       <p id="role-notice" role="status" aria-live="polite"></p><label for="role-assignment">채점할 수업</label><select id="role-assignment"><option value="">온라인에서 수업 목록을 받으세요</option></select>
       <div class="lesson-layout"><nav id="role-list" aria-label="제출물 채점 목록"></nav><div id="role-editor"></div></div>
-    </section><section id="games-section" class="role-section" aria-labelledby="games-title">
+    </section><section id="materials-section" class="role-section" aria-labelledby="materials-title">
+          <h2 id="materials-title">수업 자료 보관함</h2><p class="hint">교사용 승인 자료를 기기에 내려받고 수업에 배정할 수 있습니다. 암호화 보관함에 안전하게 저장됩니다.</p>
+          <label for="material-catalog">수업 자료</label><select id="material-catalog"><option value="">온라인 자료를 새로 받아 목록을 확인하세요</option></select>
+          <div class="answer-actions"><button id="material-download" type="button">선택한 자료 내려받기</button><button id="material-assign" type="button" class="secondary">선택한 수업에 자료 배정</button></div>
+          <progress id="material-progress" value="0" max="100" hidden></progress>
+          <p id="material-notice" role="status" aria-live="polite">보관된 자료는 계정별로 암호화되며, 열람 시 임시 파일 수명이 안전하게 관리됩니다.</p>
+          <div id="installed-materials"></div>
+        </section><section id="games-section" class="role-section" aria-labelledby="games-title">
           <h2 id="games-title">게임 보관함</h2><p class="hint">기본 설치 게임은 없습니다. 승인된 게임을 개별 설치합니다. 이 실행기는 오프라인 단독 실행을 지원하는 정적 게임용입니다.</p>
           <label for="game-catalog">마켓플레이스 게임</label><select id="game-catalog"><option value="">온라인 자료를 새로 받아 목록을 확인하세요</option></select>
           <div class="answer-actions"><button id="game-install" type="button">선택한 게임 설치</button><button id="game-assign" type="button" class="secondary">선택한 수업에 게임 배정</button></div>

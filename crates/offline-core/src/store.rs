@@ -249,8 +249,8 @@ impl Store {
             if !valid {missing.push(hash);}
         } Ok(missing)
     }
-    fn seal(&self,aad:&str,plain:&[u8])->Result<Vec<u8>> {self.key.seal(&format!("store/{}/{aad}",self.binding),plain)}
-    fn decrypt(&self,aad:&str,cipher:&[u8])->Result<Vec<u8>> {self.key.open(&format!("store/{}/{aad}",self.binding),cipher)}
+    pub(crate) fn seal(&self,aad:&str,plain:&[u8])->Result<Vec<u8>> {self.key.seal(&format!("store/{}/{aad}",self.binding),plain)}
+    pub(crate) fn decrypt(&self,aad:&str,cipher:&[u8])->Result<Vec<u8>> {self.key.open(&format!("store/{}/{aad}",self.binding),cipher)}
     pub fn storage_path(&self)->&Path {&self.home}
 }
 fn observe(tx:&Transaction<'_>,now:i64)->Result<()> {

@@ -10,7 +10,7 @@ const root=dirname(dirname(fileURLToPath(import.meta.url)));
 const edge=join(process.env['ProgramFiles(x86)'] || 'C:/Program Files (x86)','Microsoft/Edge/Application/msedge.exe');
 const output=join(root,'target/student-ui-validation'); mkdirSync(output,{recursive:true});
 const profile=mkdtempSync(join(tmpdir(),'thinkgrow-student-ui-'));
-const types={'index.html':'text/html; charset=utf-8','app.css':'text/css','app.js':'text/javascript','student.js':'text/javascript'};
+const types={'index.html':'text/html; charset=utf-8','app.css':'text/css','app.js':'text/javascript','student.js':'text/javascript','materials.js':'text/javascript','games.js':'text/javascript','roles.js':'text/javascript'};
 const server=createServer((request,response)=>{
   const name=request.url==='/'?'index.html':request.url.slice(1);
   if(!Object.hasOwn(types,name)){response.writeHead(404);response.end();return;}

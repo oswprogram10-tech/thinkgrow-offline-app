@@ -16,12 +16,24 @@ pub struct RoleReply {
 pub struct RoleDraft {pub slot:String,pub revision:u64,pub operation_id:String,pub kind:String,pub data:Value,pub state:String,pub receipt:Option<Signed>}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct SessionTicket {
+    pub protocol:u32, pub game_id:String, pub device_id:String, pub subject_id:String,
+    pub credential_epoch:u64, pub issued_ms:i64, pub expires_ms:i64,
+    #[serde(default)] pub allowed_origins:Vec<String>,
+}
+pub fn valid_online_origin(origin:&str)->bool {
+    url::Url::parse(origin).is_ok_and(|u| matches!(u.scheme(),"https"|"wss") && u.host_str().is_some()
+        && u.username().is_empty() && u.password().is_none() && u.query().is_none()
+        && u.fragment().is_none() && u.origin().ascii_serialization()==origin)
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct GameFile {pub data:String,pub sha256:String}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct GameBundle {pub id:String,pub title:String,pub version:String,pub runtime:String,pub host_api:u32,pub entry:String,pub source_sha256:String,pub files:BTreeMap<String,GameFile>}
+pub struct GameBundle {pub id:String,pub title:String,pub version:String,pub runtime:String,pub host_api:u32,pub entry:String,pub source_sha256:String,pub files:BTreeMap<String,GameFile>,#[serde(default)]pub network_mode:Option<String>}
 #[derive(Clone, Serialize, Deserialize)]
-pub struct GameInfo {pub id:String,pub title:String,pub version:String,pub source_sha256:String}
+pub struct GameInfo {pub id:String,pub title:String,pub version:String,pub source_sha256:String,#[serde(default)]pub network_mode:Option<String>,#[serde(default)]pub can_run_offline:bool}
 #[derive(Clone, Serialize, Deserialize)]
 pub struct GameRun {pub id:String,pub game:GameInfo,pub assignment_id:Option<String>,pub events:Vec<Value>,pub checkpoint:Value}
 
@@ -39,7 +51,13 @@ impl GameBundle {
             if bytes.len()>524288 || total>1048576 || crypto::hash(&bytes)!=file.sha256{return Err(Error::Signature)}
         }Ok(())
     }
-    pub fn info(&self)->GameInfo{GameInfo{id:self.id.clone(),title:self.title.clone(),version:self.version.clone(),source_sha256:self.source_sha256.clone()}}
+    pub fn info(&self)->GameInfo{
+
+        let is_offline = self.network_mode.as_deref().unwrap_or("offline_solo") == "offline_solo";
+
+        GameInfo{id:self.id.clone(),title:self.title.clone(),version:self.version.clone(),source_sha256:self.source_sha256.clone(),network_mode:self.network_mode.clone(),can_run_offline:is_offline}
+
+    }
 }
 impl Store {
     fn role_db(&self,domain:&str)->Result<Connection> {
@@ -138,11 +156,30 @@ impl Store {
     }
     pub fn start_game_for(&self,id:&str,assignment:Option<&str>,now:i64)->Result<(GameRun,GameBundle)> {
         let grant=self.role_writable(now)?;let bundle=self.game_bundle(id)?;
+        if bundle.network_mode.as_deref() == Some("online_session") {
+            return Err(Error::Invalid("online game requires verified online session"));
+        }
         if self.app==App::Student{let assignment=assignment.ok_or(Error::Authorization)?;let w=self.role_workspace()?.ok_or(Error::Authorization)?;if !grant.scopes.iter().any(|s|s.assignment_id==assignment) || w.credential_epoch!=grant.epoch || w.expires_ms<=now || !w.data["games"].as_array().is_some_and(|g|g.iter().any(|g|g["id"]==id && g["assignment_id"]==assignment && g["source_sha256"]==bundle.source_sha256)){return Err(Error::Authorization)}}
         if self.app==App::Teacher && assignment.is_some(){return Err(Error::Authorization)}
         if let Some(assignment)=assignment{crate::id(assignment)?;}
         let checkpoint=self.role_read::<Value>("role",&format!("checkpoint/{id}/{}/{}",bundle.source_sha256,assignment.unwrap_or("preview")))?.unwrap_or(Value::Null);
         let run=GameRun{id:Uuid::new_v4().to_string(),game:bundle.info(),assignment_id:assignment.map(str::to_owned),events:vec![],checkpoint};self.role_write("role",&format!("run/{}",run.id),&run)?;Ok((run,bundle))
+    }
+    pub fn start_online_game_for(&self,id:&str,assignment:Option<&str>,session_token:&str,now:i64)->Result<(GameRun,GameBundle,SessionTicket)> {
+        let grant=self.role_writable(now)?;let bundle=self.game_bundle(id)?;
+        if session_token.trim().is_empty() {
+            return Err(Error::Invalid("valid online session token required"));
+        }
+        let signed:Signed=serde_json::from_str(session_token).map_err(|_|Error::Invalid("session token format"))?;
+        let ticket:SessionTicket=signed.verify(&self.trust.credentials,"thinkgrow.game-session.v1")?;
+        if ticket.protocol!=1 || ticket.game_id!=id || ticket.device_id!=self.device || ticket.subject_id!=self.subject || ticket.credential_epoch!=grant.epoch || ticket.issued_ms>now.saturating_add(300_000) || ticket.expires_ms<=now || ticket.allowed_origins.len()>10 || !ticket.allowed_origins.iter().all(|o|valid_online_origin(o)) {
+            return Err(Error::Authorization);
+        }
+        if self.app==App::Student{let assignment=assignment.ok_or(Error::Authorization)?;let w=self.role_workspace()?.ok_or(Error::Authorization)?;if !grant.scopes.iter().any(|s|s.assignment_id==assignment) || w.credential_epoch!=grant.epoch || w.expires_ms<=now || !w.data["games"].as_array().is_some_and(|g|g.iter().any(|g|g["id"]==id && g["assignment_id"]==assignment && g["source_sha256"]==bundle.source_sha256)){return Err(Error::Authorization)}}
+        if self.app==App::Teacher && assignment.is_some(){return Err(Error::Authorization)}
+        if let Some(assignment)=assignment{crate::id(assignment)?;}
+        let checkpoint=self.role_read::<Value>("role",&format!("checkpoint/{id}/{}/{}",bundle.source_sha256,assignment.unwrap_or("preview")))?.unwrap_or(Value::Null);
+        let run=GameRun{id:Uuid::new_v4().to_string(),game:bundle.info(),assignment_id:assignment.map(str::to_owned),events:vec![],checkpoint};self.role_write("role",&format!("run/{}",run.id),&run)?;Ok((run,bundle,ticket))
     }
     pub fn game_event(&self,run_id:&str,event:Value,now:i64)->Result<Value> {
         self.role_writable(now)?;exact(&event,&["sequence","kind","data"])?;if serde_json::to_vec(&event)?.len()>16384{return Err(Error::Invalid("game event size"))}
@@ -156,5 +193,37 @@ impl Store {
         for (key,bytes) in entries{let cipher=self.seal(&format!("role/{key}"),&bytes)?;tx.execute("INSERT INTO objects VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET cipher=excluded.cipher",params![key,cipher])?;}tx.commit()?;Ok(json!({"accepted":seq}))
     }
     pub fn game_run(&self,id:&str,now:i64)->Result<GameRun>{self.role_writable(now)?;self.role_read("role",&format!("run/{id}"))?.ok_or(Error::Authorization)}
+    pub(crate) fn start_material_run(&self,info:crate::MaterialInfo,bundle:GameBundle,now:i64)->Result<(GameRun,GameBundle)>{
+        let grant=self.role_writable(now)?;
+        if self.app==App::Student{
+            let assignment=info.assignment_id.as_deref().ok_or(Error::Authorization)?;
+            let w=self.role_workspace()?.ok_or(Error::Authorization)?;
+            if w.credential_epoch!=grant.epoch || w.expires_ms<=now || !grant.scopes.iter().any(|s|s.assignment_id==assignment)
+                || !w.data["materials"].as_array().is_some_and(|a|a.iter().any(|m|m["id"]==info.id && m["assignment_id"]==assignment && m["source_sha256"]==info.sha256)) {return Err(Error::Authorization)}
+        }else if self.app!=App::Teacher{return Err(Error::Authorization)}
+        let checkpoint=self.role_read::<Value>("role",&format!("checkpoint/{}/{}/{}",info.id,info.sha256,info.assignment_id.as_deref().unwrap_or("preview")))?.unwrap_or(Value::Null);
+        let run=GameRun{id:Uuid::new_v4().to_string(),game:bundle.info(),assignment_id:info.assignment_id,events:vec![],checkpoint};
+        self.role_write("role",&format!("run/{}",run.id),&run)?;Ok((run,bundle))
+    }
+    pub(crate) fn material_session_origins(&self,info:&crate::MaterialInfo,bundle:&GameBundle,token:Option<&str>,now:i64)->Result<Vec<String>>{
+        if bundle.network_mode.as_deref()!=Some("online_session"){return Ok(vec![])}
+        let signed:Signed=serde_json::from_str(token.ok_or(Error::Authorization)?)?;
+        let ticket:SessionTicket=signed.verify(&self.trust.credentials,"thinkgrow.material-session.v1")?;
+        let grant=self.role_writable(now)?;
+        let manifest=&bundle.files["thinkgrow.app.json"];
+        let manifest:Value=serde_json::from_slice(&STANDARD.decode(&manifest.data).map_err(|_|Error::Signature)?)?;
+        if ticket.protocol!=1 || ticket.game_id!=info.id || ticket.subject_id!=self.subject || ticket.device_id!=self.device
+            || ticket.credential_epoch!=grant.epoch || ticket.issued_ms>now+300_000 || ticket.expires_ms<=now
+            || ticket.allowed_origins.len()>10 || !ticket.allowed_origins.iter().all(|o|valid_online_origin(o))
+            || serde_json::to_value(&ticket.allowed_origins)?!=manifest["allowed_origins"]{return Err(Error::Authorization)}
+        Ok(ticket.allowed_origins)
+    }
+    pub(crate) fn authorize_installer(&self,info:&crate::MaterialInfo,now:i64)->Result<()>{
+        let grant=self.role_writable(now)?;let w=self.role_workspace()?.ok_or(Error::Authorization)?;
+        if w.credential_epoch!=grant.epoch || w.expires_ms<=now || !w.data["materials"].as_array().is_some_and(|rows|rows.iter().any(|r|
+            r["id"]==info.id && r["source_sha256"]==info.sha256 && r["security_policy"]==2
+            && r["signature_status"]=="valid_signed" && r["scanner_verdict"]=="clean")){return Err(Error::Authorization)}
+        Ok(())
+    }
 }
 fn exact(value:&Value,fields:&[&str])->Result<()>{if !value.as_object().is_some_and(|v|v.len()==fields.len() && fields.iter().all(|f|v.contains_key(*f))){return Err(Error::Invalid("role action fields"))}Ok(())}

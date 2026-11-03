@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-launch-online-game"
+description = "Enables the launch_online_game command without any pre-configured scope."
+commands.allow = ["launch_online_game"]
+
+[[permission]]
+identifier = "deny-launch-online-game"
+description = "Denies the launch_online_game command without any pre-configured scope."
+commands.deny = ["launch_online_game"]

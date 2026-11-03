@@ -4,12 +4,12 @@ use serde::Serialize;
 use std::{path::PathBuf,sync::{Mutex,MutexGuard},time::{Instant,SystemTime,UNIX_EPOCH}};
 pub struct NativeAccount {pub subject:String,pub device:String,pub data_key:DataKey,pub device_signer:SigningKey}
 struct ClockAnchor {wall_start:i64,monotonic_start:Instant}
-pub struct NativeContext {base:PathBuf,app:App,session:Mutex<Option<Store>>,clock:Mutex<ClockAnchor>,game:Mutex<Option<crate::game_host::GameHost>>}
+pub struct NativeContext {base:PathBuf,app:App,session:Mutex<Option<Store>>,clock:Mutex<ClockAnchor>,game:Mutex<Option<crate::game_host::GameHost>>,ephemeral_files:Mutex<Vec<PathBuf>>}
 #[derive(Serialize)]
 pub struct CoreStatus {pub app_id:&'static str,pub protocol:u32,pub schema:u32,pub registration_required:bool,
     pub local:Option<Status>,pub default_games:u32}
 impl NativeContext {
-    pub fn new(base:PathBuf,app:App)->Self{Self{base,app,session:Mutex::new(None),clock:Mutex::new(ClockAnchor{wall_start:now(),monotonic_start:Instant::now()}),game:Mutex::new(None)}}
+    pub fn new(base:PathBuf,app:App)->Self{Self{base,app,session:Mutex::new(None),clock:Mutex::new(ClockAnchor{wall_start:now(),monotonic_start:Instant::now()}),game:Mutex::new(None),ephemeral_files:Mutex::new(Vec::new())}}
     /// Called only by a native registration/reauthentication adapter with vault-held keys.
     /// This is deliberately not exposed as a Tauri command.
     pub fn attach_registered_account(&self,account:NativeAccount,trust:Trust,grant:Option<&Signed>,now:i64,trusted_time:Option<i64>)->Result<()> {
@@ -22,7 +22,7 @@ impl NativeContext {
         }
         *self.lock()?=Some(store);Ok(())
     }
-    fn checked_now(&self)->i64 {
+    pub(crate) fn checked_now(&self)->i64 {
         let actual=now();
         let Ok(anchor)=self.clock.lock() else{return actual};
         let expected=anchor.wall_start.saturating_add(anchor.monotonic_start.elapsed().as_millis().min(i64::MAX as u128) as i64);
@@ -63,7 +63,7 @@ impl NativeContext {
     pub fn save_role_draft(&self,kind:&str,data:serde_json::Value,expected:u64)->Result<crate::workspace::RoleDraft>{self.lock()?.as_ref().ok_or(Error::Authorization)?.save_role_draft(kind,data,expected,self.checked_now())}
     pub fn role_exchange(&self,action:&str,data:serde_json::Value,fetch:impl FnOnce(&[u8])->Result<Signed>)->Result<crate::workspace::RoleReply>{
         let session=self.lock()?;let store=session.as_ref().ok_or(Error::Authorization)?;let id=uuid::Uuid::new_v4().to_string();
-        if !["workspace","install_game","assign_game","parent_read","notice_read","notice_reply"].contains(&action){return Err(Error::Authorization)}
+        if !["workspace","install_game","assign_game","parent_read","notice_read","notice_reply","download_material_chunk","assign_material","game_session","material_session"].contains(&action){return Err(Error::Authorization)}
         let request=store.role_request(action,data,&id,self.checked_now())?;let reply=fetch(&request)?;store.accept_role_reply(&reply,action,&id,self.checked_now())
     }
     pub fn sync_role_draft(&self,slot:&str,revision:u64,fetch:impl FnOnce(&[u8])->Result<Signed>)->Result<crate::workspace::RoleDraft>{
@@ -79,12 +79,49 @@ impl NativeContext {
     }
     pub fn launch_game_for(self:&std::sync::Arc<Self>,id:&str,assignment:Option<&str>)->Result<crate::game_host::Launch>{
         self.stop_game()?;let (run,bundle)=self.lock()?.as_ref().ok_or(Error::Authorization)?.start_game_for(id,assignment,self.checked_now())?;
-        let (host,launch)=crate::game_host::GameHost::start(std::sync::Arc::downgrade(self),self.app,run,bundle)?;
+        let (host,launch)=crate::game_host::GameHost::start(std::sync::Arc::downgrade(self),self.app,run,bundle,None,vec![])?;
         *self.game.lock().map_err(|_|Error::Authorization)?=Some(host);Ok(launch)
     }
     pub fn stop_game(&self)->Result<()>{*self.game.lock().map_err(|_|Error::Authorization)?=None;Ok(())}
+    pub fn launch_material_app(self:&std::sync::Arc<Self>,id:&str,token:Option<&str>)->Result<crate::game_host::Launch>{
+        self.stop_game()?;
+        let (run,bundle,origins)=self.lock()?.as_ref().ok_or(Error::Authorization)?.start_material_app(id,token,self.checked_now())?;
+        let (host,launch)=crate::game_host::GameHost::start(std::sync::Arc::downgrade(self),self.app,run,bundle,token.map(str::to_owned),origins)?;
+        *self.game.lock().map_err(|_|Error::Authorization)?=Some(host);Ok(launch)
+    }
     pub fn game_run(&self,id:&str)->Result<crate::workspace::GameRun>{self.lock()?.as_ref().ok_or(Error::Authorization)?.game_run(id,self.checked_now())}
     pub fn record_game_event(&self,id:&str,event:serde_json::Value)->Result<serde_json::Value>{self.lock()?.as_ref().ok_or(Error::Authorization)?.game_event(id,event,self.checked_now())}
-    pub fn lock_account(&self)->Result<()>{self.stop_game()?;*self.lock()?=None;Ok(())}
+    pub fn list_materials(&self)->Result<Vec<crate::MaterialInfo>>{self.lock()?.as_ref().ok_or(Error::Authorization)?.list_materials()}
+    pub fn save_material_chunk(&self,chunk:&crate::MaterialChunk,info:&crate::MaterialInfo)->Result<bool>{self.lock()?.as_ref().ok_or(Error::Authorization)?.save_material_chunk(chunk,info)}
+    pub fn get_material(&self,id:&str)->Result<Option<crate::MaterialInfo>>{self.lock()?.as_ref().ok_or(Error::Authorization)?.get_material(id)}
+    pub fn delete_material(&self,id:&str)->Result<()>{self.lock()?.as_ref().ok_or(Error::Authorization)?.delete_material(id)}
+    pub fn open_material_file(&self,id:&str)->Result<PathBuf>{
+        let guard=self.lock()?;let store=guard.as_ref().ok_or(Error::Authorization)?;
+        let info=store.get_material(id)?.ok_or(Error::Authorization)?;
+        if info.subtype=="app" {
+            if !matches!(info.app_kind.as_deref(),Some("installer"|"os_installer")){return Err(Error::Authorization)}
+            store.authorize_installer(&info,self.checked_now())?;
+        }
+        let (_info,path)=store.export_ephemeral_material(id)?;
+        if let Ok(mut files) = self.ephemeral_files.lock() { files.push(path.clone()); }
+        Ok(path)
+    }
+    pub fn launch_online_game_for(self:&std::sync::Arc<Self>,id:&str,assignment:Option<&str>,session_token:&str)->Result<crate::game_host::Launch>{
+        self.stop_game()?;let (run,bundle,ticket)=self.lock()?.as_ref().ok_or(Error::Authorization)?.start_online_game_for(id,assignment,session_token,self.checked_now())?;
+        let (host,launch)=crate::game_host::GameHost::start(std::sync::Arc::downgrade(self),self.app,run,bundle,Some(session_token.to_string()),ticket.allowed_origins)?;
+        *self.game.lock().map_err(|_|Error::Authorization)?=Some(host);Ok(launch)
+    }
+    pub fn cleanup_ephemeral(&self) {
+        if let Ok(mut files) = self.ephemeral_files.lock() {
+            for p in files.drain(..) {
+                let _ = std::fs::remove_file(&p);
+                if let Some(parent) = p.parent() { let _ = std::fs::remove_dir(parent); }
+            }
+        }
+    }
+    pub fn lock_account(&self)->Result<()>{self.stop_game()?;self.cleanup_ephemeral();*self.lock()?=None;Ok(())}
+}
+impl Drop for NativeContext {
+    fn drop(&mut self) { self.cleanup_ephemeral(); }
 }
 pub fn now()->i64{SystemTime::now().duration_since(UNIX_EPOCH).map(|d|d.as_millis().min(i64::MAX as u128) as i64).unwrap_or(0)}

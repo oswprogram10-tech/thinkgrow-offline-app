@@ -21,6 +21,34 @@ async fn sync_role_draft(state:tauri::State<'_,Arc<Registration>>,slot:String,re
 }
 
 #[tauri::command]
+fn launch_material_app(state:tauri::State<'_,Arc<NativeContext>>,id:String,session_token:Option<String>)->Result<thinkgrow_offline_core::game_host::Launch,String>{state.inner().launch_material_app(&id,session_token.as_deref()).map_err(|e|e.to_string())}
+#[tauri::command]
+fn list_class_materials(state:tauri::State<'_,Arc<NativeContext>>)->Result<Vec<thinkgrow_offline_core::MaterialInfo>,String>{state.list_materials().map_err(|e|e.to_string())}
+#[tauri::command]
+fn open_material_file(app:tauri::AppHandle,state:tauri::State<'_,Arc<NativeContext>>,id:String)->Result<String,String>{
+    let info = state.get_material(&id).map_err(|e|e.to_string())?.ok_or_else(||"material not found".to_string())?;
+    if info.subtype == "app" && info.app_kind.as_deref() == Some("web_app") {
+        return Err("웹 앱 패키지는 보안 격리 정책에 따라 운영체제 외부 연결 앱으로 열 수 없습니다.".to_string());
+    }
+    let path = state.open_material_file(&id).map_err(|e|e.to_string())?;
+    let path_str = path.to_string_lossy().to_string();
+    app.opener().open_path(&path_str, None::<&str>).map_err(|_|"could not open file with OS".to_string())?;
+    Ok(path_str)
+}
+#[tauri::command]
+fn save_material_chunk(state:tauri::State<'_,Arc<NativeContext>>,chunk:thinkgrow_offline_core::MaterialChunk,info:thinkgrow_offline_core::MaterialInfo)->Result<bool,String>{
+    state.save_material_chunk(&chunk,&info).map_err(|e|e.to_string())
+}
+#[tauri::command]
+fn delete_material(state:tauri::State<'_,Arc<NativeContext>>,id:String)->Result<(),String>{
+    state.delete_material(&id).map_err(|e|e.to_string())
+}
+#[tauri::command]
+fn launch_online_game(state:tauri::State<'_,Arc<NativeContext>>,game_id:String,assignment_id:Option<String>,session_token:String)->Result<thinkgrow_offline_core::game_host::Launch,String>{
+    state.inner().launch_online_game_for(&game_id,assignment_id.as_deref(),&session_token).map_err(|e|e.to_string())
+}
+
+#[tauri::command]
 fn list_games(state:tauri::State<'_,Arc<NativeContext>>)->Result<Vec<thinkgrow_offline_core::workspace::GameInfo>,String>{state.installed_games().map_err(|e|e.to_string())}
 #[tauri::command]
 fn launch_game(state:tauri::State<'_,Arc<NativeContext>>,game_id:String,assignment_id:Option<String>)->Result<thinkgrow_offline_core::game_host::Launch,String>{state.inner().launch_game_for(&game_id,assignment_id.as_deref()).map_err(|e|e.to_string())}
@@ -89,6 +117,6 @@ pub fn run(){
    app.manage(Arc::new(Registration::with_adapters(&base,App::Teacher,context.clone(),protector,transport)?));
    app.manage(context);
    Ok(())
- }).invoke_handler(tauri::generate_handler![load_role_workspace,role_exchange,list_role_drafts,save_role_draft,sync_role_draft,list_games,launch_game,stop_game,core_status,open_registration_page,account_status,register_account,unlock_account,change_account_pin,recover_account_pin,export_account_backup,restore_account_backup,lock_account])
+ }).invoke_handler(tauri::generate_handler![load_role_workspace,role_exchange,list_role_drafts,save_role_draft,sync_role_draft,list_games,launch_game,stop_game,list_class_materials,launch_material_app,open_material_file,save_material_chunk,delete_material,launch_online_game,core_status,open_registration_page,account_status,register_account,unlock_account,change_account_pin,recover_account_pin,export_account_backup,restore_account_backup,lock_account])
  .run(tauri::generate_context!()).expect("failed to run ThinkGrow offline app");
 }

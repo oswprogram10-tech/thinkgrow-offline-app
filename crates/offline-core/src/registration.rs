@@ -207,7 +207,7 @@ fn collect_backup_files(home:&Path,scratch:&Path)->Result<Vec<BackupFile>> {
         }else if name=="store.sqlite3" || name=="lessons.sqlite3" || name=="role.sqlite3" {
             let destination=scratch.join(&name);snapshot_database(&path,&destination)?;
             add_backup_file(&destination,name,&mut files,&mut total)?;
-        }else if ["store.sqlite3-wal","store.sqlite3-shm","store.sqlite3-journal","lessons.sqlite3-wal","lessons.sqlite3-shm","lessons.sqlite3-journal","role.sqlite3-wal","role.sqlite3-shm","role.sqlite3-journal","games.sqlite3","games.sqlite3-wal","games.sqlite3-shm","games.sqlite3-journal"].contains(&name.as_str()) {
+        }else if ["store.sqlite3-wal","store.sqlite3-shm","store.sqlite3-journal","lessons.sqlite3-wal","lessons.sqlite3-shm","lessons.sqlite3-journal","role.sqlite3-wal","role.sqlite3-shm","role.sqlite3-journal","games.sqlite3","games.sqlite3-wal","games.sqlite3-shm","games.sqlite3-journal","materials.sqlite3","materials.sqlite3-wal","materials.sqlite3-shm","materials.sqlite3-journal"].contains(&name.as_str()) {
             if !meta.is_file() || meta.file_type().is_symlink() {return Err(Error::VaultUnavailable)}
         }else{
             return Err(Error::Invalid("unsupported account file"));

@@ -25,6 +25,12 @@
     "allow-role-exchange",
     "allow-list-games",
     "allow-launch-game",
-    "allow-stop-game"
+    "allow-stop-game",
+    "allow-list-class-materials",
+    "allow-open-material-file",
+    "allow-save-material-chunk",
+    "allow-delete-material",
+    "allow-launch-online-game",
+    "allow-launch-material-app"
   ]
 }
