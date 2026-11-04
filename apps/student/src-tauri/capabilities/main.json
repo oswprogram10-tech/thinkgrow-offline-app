@@ -10,6 +10,8 @@
     "allow-load-draft",
     "allow-save-draft",
     "allow-queue-submission",
+    "allow-submission-states",
+    "allow-deliver-submissions",
     "allow-account-status",
     "allow-register-account",
     "allow-unlock-account",

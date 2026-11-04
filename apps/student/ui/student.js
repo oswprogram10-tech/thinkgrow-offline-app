@@ -4,9 +4,12 @@
   if (!invoke) return;
   let session = null, lessons = [], current = null, revision = 0, baseRevision = 0;
   let generation = 0, dirty = false, failed = false, timer, saving = Promise.resolve(), serial = 0, queuedIntent = null;
+  let onlinePending = false, delivering = false;
   let read = () => ({format:1,body:"",structured_answer:{}});
   const notice = (text,error=false) => {$("lesson-notice").textContent=text;$("lesson-notice").classList.toggle("error",error);};
   const answerState = (text,error=false) => {$("answer-state").textContent=text;$("answer-state").classList.toggle("error",error);};
+  const pad = value => String(value).padStart(2,"0");
+  const stamp = ms => {const date=new Date(ms);return date.getFullYear()+"-"+pad(date.getMonth()+1)+"-"+pad(date.getDate())+" "+pad(date.getHours())+":"+pad(date.getMinutes());};
   const writable = () => session?.local?.access === "read_write" && current && Date.now()>=current.issued_ms && Date.now()<current.expires_ms && (current.starts_ms===null || Date.now()>=current.starts_ms);
   function gate() {$("prepare-lessons").disabled=!session?.local || session.local.access!=="read_write";$("answer-fields").disabled=!writable();}
   function wipe() {clearTimeout(timer);generation++;current=null;lessons=[];read=()=>({format:1,body:"",structured_answer:{}});$("answer-controls").replaceChildren();$("lesson-list").replaceChildren();$("lesson-title").textContent="";$("lesson-prompt").textContent="";$("lesson-hint").textContent="";$("lesson-editor").hidden=true;dirty=false;failed=false;queuedIntent=null;}
@@ -44,6 +47,26 @@
     } else throw Error("unsupported question");
   }
   function repaintList() {$("lesson-list").replaceChildren();for(const lesson of lessons){const button=element("button",lesson.title||"제목 없는 수업");button.type="button";button.className="secondary";button.setAttribute("aria-current",String(current?.assignment_id===lesson.assignment_id));button.addEventListener("click",()=>open(lesson));$("lesson-list").append(button);}}
+  async function refreshStates() {
+    if(!current)return;
+    const assignment=current.assignment_id;
+    try{const states=await invoke("submission_states",{assignment});if(!current||current.assignment_id!==assignment||dirty||failed)return;
+      const latest=states&&states[0];if(!latest)return;
+      if(latest.online_state==="received"&&latest.server_received_ms!=null)answerState("제출 완료(서버 수신 "+stamp(latest.server_received_ms)+")");
+      else if(latest.online_state==="auth_wait")answerState("다시 로그인해야 보낼 수 있습니다");
+      else if(latest.online_state==="conflict")answerState("서버에 이미 다른 제출이 있거나 마감되었습니다. 선생님께 확인해 주세요.");
+      else if(latest.online_state==="pending"||latest.online_state==="sending")answerState("제출 대기 중: 인터넷이 연결되면 보냅니다");
+    }catch{}
+  }
+  async function deliver() {
+    if(!session?.local||delivering)return;
+    delivering=true;let failedDelivery=false;
+    try{const summary=await invoke("deliver_submissions");onlinePending=(summary.remaining||0)>0;}
+    catch{failedDelivery=true;onlinePending=(session?.local?.pending_online||0)>0;}
+    finally{delivering=false;}
+    if(failedDelivery){if(current&&!dirty)answerState("다음에 다시 보냅니다.");return;}
+    await refreshStates();
+  }
   async function open(lesson) {
     if(dirty){await persist();await saving;if(dirty){notice("아직 저장하지 못한 답안이 있습니다. 현재 수업에서 다시 저장해 주세요.",true);return;}}
     const mine=++generation;current=null;$("lesson-editor").hidden=true;gate();
@@ -52,7 +75,7 @@
       const response=draft?JSON.parse(draft.answer.body):null;if(response&&(response.format!==1||!response.structured_answer))throw Error("unsupported saved answer");
       current=lesson;revision=draft?.revision||0;baseRevision=draft?.answer.base_answer_revision||0;dirty=false;failed=false;queuedIntent=null;
       $("lesson-title").textContent=lesson.title;$("lesson-prompt").textContent=lesson.prompt;$("lesson-hint").textContent=lesson.hint;$("hint-box").hidden=!lesson.hint;$("hint-box").open=false;
-      controls(lesson,response);$("lesson-editor").hidden=false;answerState(writable()?(revision?"기기에 저장한 답안을 열었습니다.":"답안은 이 기기에 자동 저장됩니다."):"자격 또는 수업 준비 기간을 확인해 주세요. 보관한 자료는 읽을 수 있습니다.");repaintList();gate();
+      controls(lesson,response);$("lesson-editor").hidden=false;answerState(writable()?(revision?"기기에 저장한 답안을 열었습니다.":"답안은 이 기기에 자동 저장됩니다."):"자격 또는 수업 준비 기간을 확인해 주세요. 보관한 자료는 읽을 수 있습니다.");repaintList();gate();refreshStates();
     }catch{if(mine===generation)notice("보관한 답안을 열지 못했습니다. 자료를 덮어쓰지 않았습니다.",true);}
   }
   function persist() {
@@ -65,13 +88,15 @@
   }
   $("save-answer").addEventListener("click",()=>{if(current&&writable()){dirty=true;serial++;persist();}});
   $("answer-form").addEventListener("submit",async event=>{event.preventDefault();if(!current||!writable())return;const mine=generation;$("queue-answer").disabled=true;
-    try{if(!revision){dirty=true;serial++;}await persist();await saving;if(mine!==generation||dirty||failed)return;queuedIntent ||= crypto.randomUUID();await invoke("queue_submission",{assignment:current.assignment_id,revision,intent:queuedIntent});if(mine===generation)answerState("제출 대기열에 보관했습니다. 수신 확인은 아직 받지 않았습니다.");}
+    try{if(!revision){dirty=true;serial++;}await persist();await saving;if(mine!==generation||dirty||failed)return;queuedIntent ||= crypto.randomUUID();await invoke("queue_submission",{assignment:current.assignment_id,revision,intent:queuedIntent});if(mine===generation){onlinePending=true;answerState("제출 대기 중: 인터넷이 연결되면 보냅니다");refreshStates();deliver();}}
     catch{if(mine===generation)answerState("제출 대기열에 보관하지 못했습니다. 작성한 초안은 유지합니다.",true);}finally{if(mine===generation)$("queue-answer").disabled=!writable();}
   });
   $("prepare-lessons").addEventListener("click",async()=>{if(!session?.local||dirty){notice("작성 중인 답안을 먼저 기기에 저장하세요.",true);return;}const mine=generation;$("prepare-lessons").disabled=true;notice("등록한 수업을 준비하고 있습니다.");try{const prepared=await invoke("prepare_lessons");if(mine!==generation)return;lessons=prepared;repaintList();notice("수업을 이 기기에 보관했습니다. 이제 인터넷 없이 작성할 수 있습니다.");}catch{if(mine===generation)notice("수업을 준비하지 못했습니다. 온라인 연결과 기기 등록 때 선택한 수업을 확인하세요. 기존 자료는 보존됩니다.",true);}finally{gate();}});
-  async function applySession(core){session=core;wipe();gate();if(!session.local)return;const mine=generation;try{lessons=await invoke("list_lessons");if(mine!==generation)return;repaintList();notice(lessons.length?"보관한 수업을 선택하세요.":"기기에 보관한 수업이 없습니다. 온라인에서 수업을 준비하세요.");}catch{if(mine===generation)notice("수업 보관함을 열지 못했습니다. 기존 자료는 보존됩니다.",true);}}
+  async function applySession(core){session=core;wipe();gate();if(!session.local)return;const mine=generation;try{lessons=await invoke("list_lessons");if(mine!==generation)return;repaintList();notice(lessons.length?"보관한 수업을 선택하세요.":"기기에 보관한 수업이 없습니다. 온라인에서 수업을 준비하세요.");}catch{if(mine===generation)notice("수업 보관함을 열지 못했습니다. 기존 자료는 보존됩니다.",true);}onlinePending=(session.local.pending_online||0)>0;deliver();}
   window.addEventListener("thinkgrow-session",event=>applySession(event.detail));
+  window.addEventListener("online",()=>{deliver();});
   if(window.thinkgrowSession) applySession(window.thinkgrowSession);
   window.thinkgrowBeforeLock = async () => {clearTimeout(timer);await persist();await saving;};
   setInterval(gate,30000);
+  setInterval(()=>{if(onlinePending||(session?.local?.pending_online||0)>0)deliver();},60000);
 })();

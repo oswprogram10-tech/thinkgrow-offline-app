@@ -1,5 +1,6 @@
 //! Native-only enrollment: fixed HTTPS origin, pinned issuer keys, private device keys.
 use crate::{backup::{self,BackupExport,BackupFile},crypto::{self,DataKey},runtime::{now,CoreStatus,NativeAccount,NativeContext},vault::{LocalAccount,Opened,Secrets,Vault,OsProtector,SystemProtector},App,Error,Grant,Result,Signed,Store,Trust,PROTOCOL,WEEK_MS};
+use crate::transport::{DeliverySummary,Transport};
 use base64::{engine::general_purpose::STANDARD,Engine};
 use ed25519_dalek::SigningKey;
 use serde::{Deserialize,Serialize};
@@ -15,7 +16,7 @@ pub trait EnrollmentClient:Send+Sync { fn redeem(&self,request_json:&[u8])->Resu
     fn lessons(&self,_request_json:&[u8])->Result<Vec<Signed>> {Err(Error::ServiceNotConfigured)}
     fn role_exchange(&self,_request_json:&[u8])->Result<Signed> {Err(Error::ServiceNotConfigured)}
 }
-pub struct Registration {base:PathBuf,vault:Vault,app:App,context:Arc<NativeContext>,trust:Trust,active_credential_keys:BTreeSet<String>,origin:String,enrollment_enabled:bool,transport:Option<Arc<dyn EnrollmentClient>>,operation:Mutex<()>}
+pub struct Registration {base:PathBuf,vault:Vault,app:App,context:Arc<NativeContext>,trust:Trust,active_credential_keys:BTreeSet<String>,origin:String,enrollment_enabled:bool,transport:Option<Arc<dyn EnrollmentClient>>,online:Option<Mutex<Box<dyn Transport+Send>>>,operation:Mutex<()>}
 impl Registration {
     pub fn new(base:&Path,app:App,context:Arc<NativeContext>)->Result<Self> {
         Self::with_adapters(base,app,context,Arc::new(SystemProtector),None)
@@ -25,9 +26,31 @@ impl Registration {
         if p.format!=1 || p.service_origin!="https://schoolclassscorecheck.web.app" {return Err(Error::ServiceNotConfigured)}
         let trust=Trust{credentials:keys(p.credential_keys)?,classroom_receipts:keys(p.classroom_receipt_keys)?,online_receipts:keys(p.online_receipt_keys)?};
         if p.credential_signing_key_ids.iter().any(|id|!trust.credentials.contains_key(id)) {return Err(Error::ServiceNotConfigured)}
-        Ok(Self{base:base.to_path_buf(),vault:Vault::with_protector(base,app,protector),app,context,trust,active_credential_keys:p.credential_signing_key_ids,origin:p.service_origin,enrollment_enabled:p.registration_enabled,transport,operation:Mutex::new(())})
+        Ok(Self{base:base.to_path_buf(),vault:Vault::with_protector(base,app,protector),app,context,trust,active_credential_keys:p.credential_signing_key_ids,origin:p.service_origin,enrollment_enabled:p.registration_enabled,transport,online:None,operation:Mutex::new(())})
     }
     fn guard(&self)->Result<MutexGuard<'_,()>> {self.operation.lock().map_err(|_|Error::AccountLocked)}
+    /// Test seam for the online submission transport, in the same spirit as the
+    /// `EnrollmentClient` injection above. Production uses `HttpTransport`.
+    pub fn with_online_transport<T:Transport+Send+'static>(mut self,transport:T)->Self {
+        self.online=Some(Mutex::new(Box::new(transport)));self
+    }
+    /// Best-effort drain of the online outbox. Locked, non-student or read-only
+    /// sessions return an empty summary instead of an error.
+    pub fn deliver_online(&self)->Result<DeliverySummary> {
+        let _guard=self.guard()?;
+        if self.app!=App::Student{return Ok(DeliverySummary::default())}
+        let credential=match self.context.credential() {
+            Ok(credential)=>credential,
+            Err(Error::Authorization)|Err(Error::ReadRecoveryOnly)=>return Ok(DeliverySummary::default()),
+            Err(error)=>return Err(error),
+        };
+        if let Some(injected)=&self.online {
+            let mut transport=injected.lock().map_err(|_|Error::AccountLocked)?;
+            return self.context.deliver_online(&mut **transport)
+        }
+        let mut transport=crate::online_transport::HttpTransport::new(self.origin.clone(),credential);
+        self.context.deliver_online(&mut transport)
+    }
     pub fn status(&self)->Result<AccountStatus> {
         Ok(AccountStatus{platform_supported:self.vault.available(),service_configured:self.enrollment_enabled && !self.active_credential_keys.is_empty(),accounts:self.vault.list()?})
     }

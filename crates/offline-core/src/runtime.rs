@@ -1,15 +1,16 @@
-use crate::{crypto::DataKey,App,Answer,Draft,Envelope,Error,Result,Signed,Status,Store,Trust,PROTOCOL,SCHEMA};
+use crate::{crypto::DataKey,Access,App,Answer,Destination,Draft,Envelope,Error,Result,Signed,Status,Store,SubmissionState,Trust,PROTOCOL,SCHEMA};
+use crate::transport::{DeliverySummary,Transport};
 use ed25519_dalek::SigningKey;
 use serde::Serialize;
-use std::{path::PathBuf,sync::{Mutex,MutexGuard},time::{Instant,SystemTime,UNIX_EPOCH}};
+use std::{path::PathBuf,sync::{atomic::{AtomicU64,Ordering},Mutex,MutexGuard},time::{Instant,SystemTime,UNIX_EPOCH}};
 pub struct NativeAccount {pub subject:String,pub device:String,pub data_key:DataKey,pub device_signer:SigningKey}
 struct ClockAnchor {wall_start:i64,monotonic_start:Instant}
-pub struct NativeContext {base:PathBuf,app:App,session:Mutex<Option<Store>>,clock:Mutex<ClockAnchor>,game:Mutex<Option<crate::game_host::GameHost>>,ephemeral_files:Mutex<Vec<PathBuf>>}
+pub struct NativeContext {base:PathBuf,app:App,session:Mutex<Option<Store>>,session_generation:AtomicU64,clock:Mutex<ClockAnchor>,game:Mutex<Option<crate::game_host::GameHost>>,ephemeral_files:Mutex<Vec<PathBuf>>}
 #[derive(Serialize)]
 pub struct CoreStatus {pub app_id:&'static str,pub protocol:u32,pub schema:u32,pub registration_required:bool,
     pub local:Option<Status>,pub default_games:u32}
 impl NativeContext {
-    pub fn new(base:PathBuf,app:App)->Self{crate::class_materials::cleanup_stale_ephemeral(app);Self{base,app,session:Mutex::new(None),clock:Mutex::new(ClockAnchor{wall_start:now(),monotonic_start:Instant::now()}),game:Mutex::new(None),ephemeral_files:Mutex::new(Vec::new())}}
+    pub fn new(base:PathBuf,app:App)->Self{crate::class_materials::cleanup_stale_ephemeral(app);Self{base,app,session:Mutex::new(None),session_generation:AtomicU64::new(0),clock:Mutex::new(ClockAnchor{wall_start:now(),monotonic_start:Instant::now()}),game:Mutex::new(None),ephemeral_files:Mutex::new(Vec::new())}}
     /// Called only by a native registration/reauthentication adapter with vault-held keys.
     /// This is deliberately not exposed as a Tauri command.
     pub fn attach_registered_account(&self,account:NativeAccount,trust:Trust,grant:Option<&Signed>,now:i64,trusted_time:Option<i64>)->Result<()> {
@@ -20,7 +21,12 @@ impl NativeContext {
         if let Some(server_time)=trusted_time {
             *self.clock.lock().map_err(|_|Error::Invalid("trusted clock unavailable"))?=ClockAnchor{wall_start:server_time,monotonic_start:Instant::now()};
         }
-        *self.lock()?=Some(store);Ok(())
+        {
+            let mut session=self.lock()?;
+            *session=Some(store);
+            self.session_generation.fetch_add(1,Ordering::SeqCst);
+        }
+        Ok(())
     }
     pub(crate) fn checked_now(&self)->i64 {
         let actual=now();
@@ -57,6 +63,54 @@ impl NativeContext {
     pub fn submit_prepared(&self,assignment:&str,revision:u64,intent:&str)->Result<Envelope>{
         let intent=uuid::Uuid::parse_str(intent).map_err(|_|Error::Invalid("submission intent"))?;
         let current=self.checked_now();self.lock()?.as_mut().ok_or(Error::Authorization)?.submit_prepared(assignment,revision,intent,current)
+    }
+    pub(crate) fn credential(&self)->Result<Signed> {
+        self.lock()?.as_ref().ok_or(Error::Authorization)?.signed_grant()
+    }
+    pub(crate) fn deliver_online(&self,transport:&mut dyn Transport)->Result<DeliverySummary> {
+        let mut summary=DeliverySummary::default();
+        let current=self.checked_now();
+        {
+            let mut session=self.lock()?;
+            let Some(store)=session.as_mut() else{return Ok(summary)};
+            if self.app!=App::Student || store.access(current)?!=Access::ReadWrite {
+                return Ok(summary);
+            }
+        }
+        // Network I/O must not hold the native session lock: drafts, lesson
+        // changes and account locking stay responsive during a delivery pass.
+        for _ in 0..20 {
+            let now=self.checked_now();
+            let (lease,generation)={
+                let mut session=self.lock()?;
+                let Some(store)=session.as_mut() else{return Ok(summary)};
+                let lease=match store.lease(Destination::Online,now) {
+                    Ok(Some(lease))=>lease,
+                    Ok(None)=>break,
+                    Err(Error::Authorization)|Err(Error::ReadRecoveryOnly)=>return Ok(summary),
+                    Err(error)=>return Err(error),
+                };
+                (lease,self.session_generation.load(Ordering::SeqCst))
+            };
+            let reply=transport.send(Destination::Online,&lease.envelope);
+            let settled=self.checked_now();
+            let mut session=self.lock()?;
+            if self.session_generation.load(Ordering::SeqCst)!=generation {break}
+            let Some(store)=session.as_mut() else{break};
+            match crate::transport::settle(store,&lease,reply,settled)? {
+                crate::transport::Tick::Idle=>break,
+                crate::transport::Tick::Received=>summary.received=summary.received.saturating_add(1),
+                crate::transport::Tick::Deferred=>summary.deferred=summary.deferred.saturating_add(1),
+                crate::transport::Tick::AuthenticationRequired=>summary.auth_required=summary.auth_required.saturating_add(1),
+                crate::transport::Tick::Conflict=>summary.conflicts=summary.conflicts.saturating_add(1),
+            }
+        }
+        let mut session=self.lock()?;
+        if let Some(store)=session.as_mut(){summary.remaining=store.pending(Destination::Online)?;}
+        Ok(summary)
+    }
+    pub fn submission_states(&self,assignment:&str)->Result<Vec<SubmissionState>> {
+        self.lock()?.as_ref().ok_or(Error::Authorization)?.submission_states(assignment)
     }
     pub fn role_workspace(&self)->Result<Option<crate::workspace::RoleReply>>{self.lock()?.as_ref().ok_or(Error::Authorization)?.role_workspace()}
     pub fn role_drafts(&self)->Result<Vec<crate::workspace::RoleDraft>>{self.lock()?.as_ref().ok_or(Error::Authorization)?.role_drafts()}
@@ -119,7 +173,13 @@ impl NativeContext {
             }
         }
     }
-    pub fn lock_account(&self)->Result<()>{self.stop_game()?;self.cleanup_ephemeral();*self.lock()?=None;Ok(())}
+    pub fn lock_account(&self)->Result<()>{
+        self.stop_game()?;self.cleanup_ephemeral();
+        let mut session=self.lock()?;
+        *session=None;
+        self.session_generation.fetch_add(1,Ordering::SeqCst);
+        Ok(())
+    }
 }
 impl Drop for NativeContext {
     fn drop(&mut self) { self.cleanup_ephemeral(); }
