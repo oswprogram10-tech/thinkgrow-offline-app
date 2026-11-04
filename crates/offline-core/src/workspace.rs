@@ -194,16 +194,21 @@ impl Store {
     }
     pub fn game_run(&self,id:&str,now:i64)->Result<GameRun>{self.role_writable(now)?;self.role_read("role",&format!("run/{id}"))?.ok_or(Error::Authorization)}
     pub(crate) fn start_material_run(&self,info:crate::MaterialInfo,bundle:GameBundle,now:i64)->Result<(GameRun,GameBundle)>{
-        let grant=self.role_writable(now)?;
-        if self.app==App::Student{
-            let assignment=info.assignment_id.as_deref().ok_or(Error::Authorization)?;
-            let w=self.role_workspace()?.ok_or(Error::Authorization)?;
-            if w.credential_epoch!=grant.epoch || w.expires_ms<=now || !grant.scopes.iter().any(|s|s.assignment_id==assignment)
-                || !w.data["materials"].as_array().is_some_and(|a|a.iter().any(|m|m["id"]==info.id && m["assignment_id"]==assignment && m["source_sha256"]==info.sha256)) {return Err(Error::Authorization)}
-        }else if self.app!=App::Teacher{return Err(Error::Authorization)}
+        self.authorize_student_material(&info,now)?;
+        if self.app==App::Parent{return Err(Error::Authorization)}
         let checkpoint=self.role_read::<Value>("role",&format!("checkpoint/{}/{}/{}",info.id,info.sha256,info.assignment_id.as_deref().unwrap_or("preview")))?.unwrap_or(Value::Null);
         let run=GameRun{id:Uuid::new_v4().to_string(),game:bundle.info(),assignment_id:info.assignment_id,events:vec![],checkpoint};
         self.role_write("role",&format!("run/{}",run.id),&run)?;Ok((run,bundle))
+    }
+    /// Student material runs and chunk downloads share the same enrolled-workspace check.
+    pub(crate) fn authorize_student_material(&self,info:&crate::MaterialInfo,now:i64)->Result<()>{
+        let grant=self.role_writable(now)?;
+        if self.app!=App::Student{return Ok(())}
+        let assignment=info.assignment_id.as_deref().ok_or(Error::Authorization)?;
+        let w=self.role_workspace()?.ok_or(Error::Authorization)?;
+        if w.credential_epoch!=grant.epoch || w.expires_ms<=now || !grant.scopes.iter().any(|s|s.assignment_id==assignment)
+            || !w.data["materials"].as_array().is_some_and(|a|a.iter().any(|m|m["id"]==info.id && m["assignment_id"]==assignment && m["source_sha256"]==info.sha256)) {return Err(Error::Authorization)}
+        Ok(())
     }
     pub(crate) fn material_session_origins(&self,info:&crate::MaterialInfo,bundle:&GameBundle,token:Option<&str>,now:i64)->Result<Vec<String>>{
         if bundle.network_mode.as_deref()!=Some("online_session"){return Ok(vec![])}

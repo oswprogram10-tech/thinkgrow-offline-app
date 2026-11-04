@@ -2,7 +2,7 @@ use thinkgrow_offline_core::{*,crypto::{self,DataKey},transport::*};
 use ed25519_dalek::SigningKey;
 use tempfile::TempDir;
 use uuid::Uuid;
-use rusqlite::Connection;
+use rusqlite::{params, Connection};
 const NOW:i64=20_000;
 
 #[test]fn material_apps_require_the_enrolled_hash_and_a_separate_online_ticket(){
@@ -13,9 +13,10 @@ const NOW:i64=20_000;
   let bytes=archive(network);let hash=crypto::hash(&bytes);
   let info=MaterialInfo{id:id.into(),version:"1.0.0".into(),subtype:"app".into(),app_kind:Some("web_app".into()),title:"App".into(),filename:"app.zip".into(),size:bytes.len() as u64,sha256:hash.clone(),assignment_id:Some("assignment".into()),teacher_id:Some("teacher".into()),sync_at:NOW,offline_available:network=="offline"};
   let chunk=MaterialChunk{material_id:id.into(),offset:0,length:bytes.len(),total_size:bytes.len() as u64,sha256:hash.clone(),filename:"app.zip".into(),chunk_data_b64:STANDARD.encode(&bytes)};
-  student.save_material_chunk(&chunk,&info).unwrap();assert!(student.start_material_app(id,None,NOW).is_err());
+  assert!(student.start_material_app(id,None,NOW).is_err());
   let data=serde_json::json!({"role":"student","materials":[{"id":id,"assignment_id":"assignment","source_sha256":hash}]});
   student.accept_role_reply(&role_signed(&f,App::Student,"workspace",data),"workspace","11111111-1111-4111-8111-111111111111",NOW).unwrap();
+  student.save_material_chunk(&chunk,&info,NOW).unwrap();
   if network=="offline"{let (run,_,_)=student.start_material_app(id,None,NOW).unwrap();assert!(student.game_run(&run.id,NOW).is_ok());}
   else{
    assert!(student.start_material_app(id,None,NOW).is_err());
@@ -24,6 +25,61 @@ const NOW:i64=20_000;
    let token=serde_json::to_string(&signed).unwrap();assert!(student.start_material_app(id,Some(&token),NOW).is_ok());
   }
  }
+}
+
+fn material_info_for(id:&str,data:&[u8])->MaterialInfo {
+ MaterialInfo{id:id.into(),version:"1.0.0".into(),subtype:"pdf".into(),app_kind:None,title:"수업 자료".into(),filename:"lesson.pdf".into(),size:data.len() as u64,sha256:crypto::hash(data),assignment_id:Some("assignment".into()),teacher_id:Some("teacher".into()),sync_at:NOW,offline_available:true}
+}
+fn material_chunk_for(info:&MaterialInfo,data:&[u8],offset:u64)->MaterialChunk {
+ MaterialChunk{material_id:info.id.clone(),offset,length:data.len(),total_size:info.size,sha256:info.sha256.clone(),filename:info.filename.clone(),chunk_data_b64:crypto::b64(data)}
+}
+#[test]fn material_chunks_are_sealed_at_rest(){
+ let f=Fixture::new();let s=teacher_store(&f);let data=b"PLAINTEXT-CHUNK-MARKER-lesson-bytes";let info=material_info_for("mat-sealed",data);
+ assert!(!s.save_material_chunk(&material_chunk_for(&info,&data[..16],0),&info,NOW).unwrap());
+ let db=Connection::open(s.storage_path().join("materials.sqlite3")).unwrap();
+ let stored:Vec<u8>=db.query_row("SELECT chunk_data FROM download_chunks WHERE material_id=?1 AND offset=0",["mat-sealed"],|r|r.get(0)).unwrap();
+ assert!(!stored.windows(data.len()).any(|w|w==data));
+ assert!(!stored.windows(16).any(|w|w==&data[..16]));
+}
+#[test]fn material_chunk_mismatch_is_rejected(){
+ let f=Fixture::new();let s=teacher_store(&f);let data=b"0123456789";let info=material_info_for("mat-mismatch",data);
+ let valid=material_chunk_for(&info,data,0);
+ let mut bad=valid.clone();bad.material_id="mat-other".into();assert!(matches!(s.save_material_chunk(&bad,&info,NOW),Err(Error::Invalid(_))));
+ let mut bad=valid.clone();bad.sha256="b".repeat(64);assert!(matches!(s.save_material_chunk(&bad,&info,NOW),Err(Error::Invalid(_))));
+ let mut bad=valid.clone();bad.total_size=info.size+1;assert!(matches!(s.save_material_chunk(&bad,&info,NOW),Err(Error::Invalid(_))));
+ let empty=material_info_for("mat-empty",b"");assert!(matches!(s.save_material_chunk(&material_chunk_for(&empty,b"",0),&empty,NOW),Err(Error::Invalid(_))));
+ let mut too_large=material_info_for("mat-large",b"");too_large.size=thinkgrow_offline_core::class_materials::MAX_MATERIAL_BYTES+1;
+ let mut chunk=material_chunk_for(&too_large,b"",0);chunk.total_size=too_large.size;assert!(matches!(s.save_material_chunk(&chunk,&too_large,NOW),Err(Error::Invalid(_))));
+ let mut bad=valid.clone();bad.offset=u64::MAX;bad.length=2;bad.chunk_data_b64=crypto::b64(b"12");assert!(matches!(s.save_material_chunk(&bad,&info,NOW),Err(Error::Invalid(_))));
+ let mut bad=valid.clone();bad.offset=8;bad.length=5;bad.chunk_data_b64=crypto::b64(b"56789");assert!(matches!(s.save_material_chunk(&bad,&info,NOW),Err(Error::Invalid(_))));
+}
+#[test]fn student_cannot_store_unassigned_material(){
+ let f=Fixture::new();let s=f.store();let data=b"assigned material";let info=material_info_for("mat-unassigned",data);
+ assert!(matches!(s.save_material_chunk(&material_chunk_for(&info,data,0),&info,NOW),Err(Error::Authorization)));
+}
+#[test]fn stale_plaintext_chunks_force_redownload(){
+ let f=Fixture::new();let s=teacher_store(&f);let data=b"stale-chunk-plaintext";let info=material_info_for("mat-stale",data);
+ s.list_materials().unwrap();
+ let split=8;
+ {let db=Connection::open(s.storage_path().join("materials.sqlite3")).unwrap();
+  db.execute("INSERT OR REPLACE INTO download_chunks (material_id,offset,length,chunk_data) VALUES (?1,?2,?3,?4)",
+   params!["mat-stale",0i64,split as i64,&data[..split]]).unwrap();}
+ assert!(matches!(s.save_material_chunk(&material_chunk_for(&info,&data[split..],split as u64),&info,NOW),Err(Error::Invalid("stale download chunks"))));
+ let db=Connection::open(s.storage_path().join("materials.sqlite3")).unwrap();
+ let remaining:i64=db.query_row("SELECT count(*) FROM download_chunks WHERE material_id=?1",["mat-stale"],|r|r.get(0)).unwrap();
+ assert_eq!(remaining,0);
+}
+#[test]fn cleanup_stale_ephemeral_only_removes_own_app_dirs(){
+ let root=tempfile::tempdir().unwrap();let tmp=root.path().join("tmp");std::fs::create_dir_all(&tmp).unwrap();
+ let previous=(std::env::var_os("TMP"),std::env::var_os("TEMP"));std::env::set_var("TMP",&tmp);std::env::set_var("TEMP",&tmp);
+ let teacher=tmp.join("tg-mat-teacher-aaaa");let student=tmp.join("tg-mat-student-bbbb");let parent=tmp.join("tg-mat-parent-cccc");
+ for path in [&teacher,&student,&parent]{std::fs::create_dir_all(path).unwrap();}
+ let teacher_file=tmp.join("tg-mat-teacher-file");std::fs::write(&teacher_file,b"not a directory").unwrap();
+ let unrelated=tmp.join("unrelated");std::fs::create_dir_all(&unrelated).unwrap();
+ thinkgrow_offline_core::class_materials::cleanup_stale_ephemeral(App::Teacher);
+ assert!(!teacher.exists());assert!(student.exists());assert!(parent.exists());assert!(teacher_file.is_file());assert!(unrelated.exists());
+ match previous.0{Some(value)=>std::env::set_var("TMP",value),None=>std::env::remove_var("TMP")}
+ match previous.1{Some(value)=>std::env::set_var("TEMP",value),None=>std::env::remove_var("TEMP")}
 }
 
 fn role_signed(f:&Fixture,app:App,action:&str,data:serde_json::Value)->Signed {

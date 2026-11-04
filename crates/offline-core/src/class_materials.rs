@@ -15,6 +15,33 @@ fn default_true() -> bool {
     true
 }
 
+pub const MAX_MATERIAL_BYTES: u64 = 512 * 1024 * 1024;
+
+fn app_label(app: App) -> &'static str {
+    match app {
+        App::Teacher => "teacher",
+        App::Student => "student",
+        App::Parent => "parent",
+    }
+}
+
+pub fn cleanup_stale_ephemeral(app: App) {
+    let prefix = format!("tg-mat-{}-", app_label(app));
+    let Ok(entries) = fs::read_dir(std::env::temp_dir()) else { return };
+    for entry in entries.flatten() {
+        let file_name = entry.file_name();
+        let Some(name) = file_name.to_str() else { continue };
+        if !name.starts_with(&prefix) {
+            continue;
+        }
+        let Ok(metadata) = fs::symlink_metadata(entry.path()) else { continue };
+        if metadata.file_type().is_symlink() || !metadata.is_dir() {
+            continue;
+        }
+        let _ = fs::remove_dir_all(entry.path());
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MaterialInfo {
     pub id: String,
@@ -176,11 +203,21 @@ impl Store {
         }
     }
 
-    pub fn save_material_chunk(&self, chunk: &MaterialChunk, info: &MaterialInfo) -> Result<bool> {
+    pub fn save_material_chunk(&self, chunk: &MaterialChunk, info: &MaterialInfo, now: i64) -> Result<bool> {
         crate::id(&chunk.material_id)?;
+        if chunk.material_id != info.id || chunk.sha256 != info.sha256 || chunk.total_size != info.size {
+            return Err(Error::Invalid("material metadata mismatch"));
+        }
+        if info.size == 0 || info.size > MAX_MATERIAL_BYTES {
+            return Err(Error::Invalid("material size"));
+        }
+        if chunk.offset.checked_add(chunk.length as u64).is_none_or(|end| end > chunk.total_size) {
+            return Err(Error::Invalid("chunk range"));
+        }
         if !crate::digest(&chunk.sha256) {
             return Err(Error::Invalid("invalid sha256"));
         }
+        self.authorize_student_material(info, now)?;
         let chunk_bytes = STANDARD
             .decode(&chunk.chunk_data_b64)
             .map_err(|_| Error::Invalid("chunk encoding"))?;
@@ -188,11 +225,16 @@ impl Store {
             return Err(Error::Invalid("chunk length mismatch"));
         }
 
+        let sealed_chunk = self.seal(
+            &format!("materials-chunk/{}/{}", chunk.material_id, chunk.offset),
+            &chunk_bytes,
+        )?;
+
         let mut db = self.materials_db()?;
         let tx = db.transaction()?;
         tx.execute(
             "INSERT OR REPLACE INTO download_chunks (material_id, offset, length, chunk_data) VALUES (?1, ?2, ?3, ?4)",
-            params![chunk.material_id, chunk.offset as i64, chunk.length as i64, chunk_bytes],
+            params![chunk.material_id, chunk.offset as i64, chunk.length as i64, sealed_chunk],
         )?;
 
         // Check if all chunks received
@@ -215,12 +257,28 @@ impl Store {
 
         let mut assembled = Vec::new();
         let mut expected_offset: u64 = 0;
-        for (off, len, data) in chunks {
+        for (off, len, sealed) in chunks {
             if off != expected_offset {
                 // Gap in chunks: still in progress
                 tx.commit()?;
                 return Ok(false);
             }
+            let data = match self.decrypt(
+                &format!("materials-chunk/{}/{}", chunk.material_id, off),
+                &sealed,
+            ) {
+                Ok(data) if data.len() == len => data,
+                _ => {
+                    // Chunks written by an older plaintext version (or tampered
+                    // rows) cannot be assembled: drop them and redownload.
+                    tx.execute(
+                        "DELETE FROM download_chunks WHERE material_id = ?1",
+                        [&chunk.material_id],
+                    )?;
+                    tx.commit()?;
+                    return Err(Error::Invalid("stale download chunks"));
+                }
+            };
             assembled.extend_from_slice(&data);
             expected_offset += len as u64;
         }
@@ -351,7 +409,7 @@ impl Store {
     pub fn export_ephemeral_material(&self, id: &str) -> Result<(MaterialInfo, PathBuf)> {
         let (info, plain) = self.decrypt_material(id)?;
         let safe_name = sanitize_material_filename(&info.filename);
-        let temp_dir = std::env::temp_dir().join(format!("tg-mat-{}", Uuid::new_v4().simple()));
+        let temp_dir = std::env::temp_dir().join(format!("tg-mat-{}-{}", app_label(self.app_kind()), Uuid::new_v4().simple()));
         fs::create_dir_all(&temp_dir)?;
         let target_path = temp_dir.join(safe_name);
         fs::write(&target_path, &plain)?;

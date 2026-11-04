@@ -9,7 +9,7 @@ pub struct NativeContext {base:PathBuf,app:App,session:Mutex<Option<Store>>,cloc
 pub struct CoreStatus {pub app_id:&'static str,pub protocol:u32,pub schema:u32,pub registration_required:bool,
     pub local:Option<Status>,pub default_games:u32}
 impl NativeContext {
-    pub fn new(base:PathBuf,app:App)->Self{Self{base,app,session:Mutex::new(None),clock:Mutex::new(ClockAnchor{wall_start:now(),monotonic_start:Instant::now()}),game:Mutex::new(None),ephemeral_files:Mutex::new(Vec::new())}}
+    pub fn new(base:PathBuf,app:App)->Self{crate::class_materials::cleanup_stale_ephemeral(app);Self{base,app,session:Mutex::new(None),clock:Mutex::new(ClockAnchor{wall_start:now(),monotonic_start:Instant::now()}),game:Mutex::new(None),ephemeral_files:Mutex::new(Vec::new())}}
     /// Called only by a native registration/reauthentication adapter with vault-held keys.
     /// This is deliberately not exposed as a Tauri command.
     pub fn attach_registered_account(&self,account:NativeAccount,trust:Trust,grant:Option<&Signed>,now:i64,trusted_time:Option<i64>)->Result<()> {
@@ -92,7 +92,7 @@ impl NativeContext {
     pub fn game_run(&self,id:&str)->Result<crate::workspace::GameRun>{self.lock()?.as_ref().ok_or(Error::Authorization)?.game_run(id,self.checked_now())}
     pub fn record_game_event(&self,id:&str,event:serde_json::Value)->Result<serde_json::Value>{self.lock()?.as_ref().ok_or(Error::Authorization)?.game_event(id,event,self.checked_now())}
     pub fn list_materials(&self)->Result<Vec<crate::MaterialInfo>>{self.lock()?.as_ref().ok_or(Error::Authorization)?.list_materials()}
-    pub fn save_material_chunk(&self,chunk:&crate::MaterialChunk,info:&crate::MaterialInfo)->Result<bool>{self.lock()?.as_ref().ok_or(Error::Authorization)?.save_material_chunk(chunk,info)}
+    pub fn save_material_chunk(&self,chunk:&crate::MaterialChunk,info:&crate::MaterialInfo)->Result<bool>{self.lock()?.as_ref().ok_or(Error::Authorization)?.save_material_chunk(chunk,info,self.checked_now())}
     pub fn get_material(&self,id:&str)->Result<Option<crate::MaterialInfo>>{self.lock()?.as_ref().ok_or(Error::Authorization)?.get_material(id)}
     pub fn delete_material(&self,id:&str)->Result<()>{self.lock()?.as_ref().ok_or(Error::Authorization)?.delete_material(id)}
     pub fn open_material_file(&self,id:&str)->Result<PathBuf>{
