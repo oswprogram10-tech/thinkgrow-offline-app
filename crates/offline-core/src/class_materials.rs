@@ -25,9 +25,9 @@ fn app_label(app: App) -> &'static str {
     }
 }
 
-pub fn cleanup_stale_ephemeral(app: App) {
+pub fn cleanup_stale_ephemeral_in(dir: &std::path::Path, app: App) {
     let prefix = format!("tg-mat-{}-", app_label(app));
-    let Ok(entries) = fs::read_dir(std::env::temp_dir()) else { return };
+    let Ok(entries) = fs::read_dir(dir) else { return };
     for entry in entries.flatten() {
         let file_name = entry.file_name();
         let Some(name) = file_name.to_str() else { continue };
@@ -40,6 +40,10 @@ pub fn cleanup_stale_ephemeral(app: App) {
         }
         let _ = fs::remove_dir_all(entry.path());
     }
+}
+
+pub fn cleanup_stale_ephemeral(app: App) {
+    cleanup_stale_ephemeral_in(&std::env::temp_dir(), app)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

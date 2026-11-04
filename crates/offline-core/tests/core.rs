@@ -71,15 +71,12 @@ fn material_chunk_for(info:&MaterialInfo,data:&[u8],offset:u64)->MaterialChunk {
 }
 #[test]fn cleanup_stale_ephemeral_only_removes_own_app_dirs(){
  let root=tempfile::tempdir().unwrap();let tmp=root.path().join("tmp");std::fs::create_dir_all(&tmp).unwrap();
- let previous=(std::env::var_os("TMP"),std::env::var_os("TEMP"));std::env::set_var("TMP",&tmp);std::env::set_var("TEMP",&tmp);
  let teacher=tmp.join("tg-mat-teacher-aaaa");let student=tmp.join("tg-mat-student-bbbb");let parent=tmp.join("tg-mat-parent-cccc");
  for path in [&teacher,&student,&parent]{std::fs::create_dir_all(path).unwrap();}
  let teacher_file=tmp.join("tg-mat-teacher-file");std::fs::write(&teacher_file,b"not a directory").unwrap();
  let unrelated=tmp.join("unrelated");std::fs::create_dir_all(&unrelated).unwrap();
- thinkgrow_offline_core::class_materials::cleanup_stale_ephemeral(App::Teacher);
+ thinkgrow_offline_core::class_materials::cleanup_stale_ephemeral_in(&tmp,App::Teacher);
  assert!(!teacher.exists());assert!(student.exists());assert!(parent.exists());assert!(teacher_file.is_file());assert!(unrelated.exists());
- match previous.0{Some(value)=>std::env::set_var("TMP",value),None=>std::env::remove_var("TMP")}
- match previous.1{Some(value)=>std::env::set_var("TEMP",value),None=>std::env::remove_var("TEMP")}
 }
 
 fn role_signed(f:&Fixture,app:App,action:&str,data:serde_json::Value)->Signed {
