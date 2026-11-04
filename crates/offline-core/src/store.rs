@@ -76,6 +76,34 @@ impl Store {
             }
             Ok(grant)}).transpose()
     }
+    pub(crate) fn signed_grant(&self)->Result<Signed> {
+        let raw:String=self.db.query_row("SELECT value FROM meta WHERE key='grant'",[],|r|r.get(0))?;
+        let signed:Signed=serde_json::from_str(&raw)?;
+        Ok(signed)
+    }
+    /// Recent submissions for one assignment, newest first. Only the online
+    /// delivery state is reported; classroom relay is a separate delivery.
+    pub fn submission_states(&self,assignment:&str)->Result<Vec<SubmissionState>> {
+        if self.app!=App::Student {return Err(Error::Authorization);}
+        let mut query=self.db.prepare(
+            "SELECT o.operation_id,o.cipher,d.state,r.signed FROM outbox o
+             LEFT JOIN deliveries d ON d.operation_id=o.operation_id AND d.destination='online'
+             LEFT JOIN receipts r ON r.operation_id=o.operation_id AND r.destination='online'
+             ORDER BY o.rowid DESC")?;
+        let rows=query.query_map([],|r|Ok((r.get::<_,String>(0)?,r.get::<_,Vec<u8>>(1)?,
+            r.get::<_,Option<String>>(2)?,r.get::<_,Option<String>>(3)?)))?;
+        let mut states=Vec::new();
+        for row in rows {
+            let (operation_id,cipher,state,signed)=row?;
+            let envelope:Envelope=serde_json::from_slice(&self.decrypt(&format!("operation/{operation_id}"),&cipher)?)?;
+            if envelope.operation.answer.assignment_id!=assignment {continue;}
+            let server_received_ms=signed.and_then(|raw|receipt_server_ms(&raw));
+            states.push(SubmissionState{operation_id,online_state:state.unwrap_or_else(||"pending".into()),
+                created_ms:envelope.operation.created_ms,server_received_ms});
+            if states.len()==5 {break;}
+        }
+        Ok(states)
+    }
     pub fn access(&self,now:i64)->Result<Access> {
         let Some(g)=self.grant()? else{return Ok(Access::ProvisioningRequired)};
         let floor:i64=self.db.query_row("SELECT wall_floor FROM counters",[],|r|r.get(0))?;
@@ -109,7 +137,7 @@ impl Store {
             pending_online:self.pending(Destination::Online)?,installed_games:games.unwrap_or(0),games_unavailable})
     }
     pub fn pending(&self,dest:Destination)->Result<u64> {
-        Ok(self.db.query_row("SELECT count(*) FROM deliveries WHERE destination=?1 AND state NOT IN ('received','cancelled')",
+        Ok(self.db.query_row("SELECT count(*) FROM deliveries WHERE destination=?1 AND state NOT IN ('received','cancelled','superseded')",
             [dest.text()],|r|read_u64(r,0))?)
     }
     pub fn load_draft(&self,assignment:&str)->Result<Option<Draft>> {
@@ -152,9 +180,9 @@ impl Store {
         tx.execute("UPDATE counters SET seq=seq+1",[])?;
         let seq:u64=tx.query_row("SELECT seq FROM counters",[],|r|read_u64(r,0))?;
         let id=Uuid::new_v4().to_string();
-        let operation=Operation{protocol:PROTOCOL,operation_id:id.clone(),origin_device_id:self.device.clone(),
+        let operation=Operation{protocol:OPERATION_PROTOCOL,operation_id:id.clone(),origin_device_id:self.device.clone(),
             device_seq:seq,subject_id:self.subject.clone(),app_id:self.app.id().into(),credential_epoch:g.epoch,
-            kind:"submission".into(),answer:draft.answer,draft_revision:revision,payload_hash};
+            kind:"submission".into(),answer:draft.answer,draft_revision:revision,payload_hash,created_ms:Some(now)};
         let proof=crypto::sign(&self.signer,"thinkgrow.operation.v1",&serde_json::to_vec(&operation)?);
         let envelope=Envelope{operation,proof};
         let cipher=self.key.seal(&format!("store/{}/operation/{id}",self.binding),&serde_json::to_vec(&envelope)?)?;
@@ -200,6 +228,13 @@ impl Store {
         tx.execute("INSERT INTO receipts VALUES(?1,?2,?3)",params![receipt.operation_id,expected.text(),encoded])?;
         tx.execute("UPDATE deliveries SET state='received',lease=NULL,lease_until=0 WHERE operation_id=?1 AND destination=?2",
             params![receipt.operation_id,expected.text()])?;
+        // A server-verified online receipt makes the classroom relay copy
+        // unnecessary; retire any copy that has not already completed.
+        if expected==Destination::Online {
+            tx.execute("UPDATE deliveries SET state='superseded',lease=NULL,lease_until=0
+                WHERE operation_id=?1 AND destination='classroom' AND state IN ('pending','auth_wait','sending')",
+                [&receipt.operation_id])?;
+        }
         tx.commit()?; Ok(true)
     }
     pub fn delivery_failed(&mut self,lease:&Lease,state:&str,next_ms:i64,remote:Option<&str>)->Result<()> {
@@ -253,6 +288,15 @@ impl Store {
     pub(crate) fn seal(&self,aad:&str,plain:&[u8])->Result<Vec<u8>> {self.key.seal(&format!("store/{}/{aad}",self.binding),plain)}
     pub(crate) fn decrypt(&self,aad:&str,cipher:&[u8])->Result<Vec<u8>> {self.key.open(&format!("store/{}/{aad}",self.binding),cipher)}
     pub fn storage_path(&self)->&Path {&self.home}
+}
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct SubmissionState {
+    pub operation_id:String, pub online_state:String, pub created_ms:Option<i64>, pub server_received_ms:Option<i64>,
+}
+fn receipt_server_ms(raw:&str)->Option<i64> {
+    let signed:Signed=serde_json::from_str(raw).ok()?;
+    let payload:serde_json::Value=serde_json::from_str(&signed.payload).ok()?;
+    payload.get("server_received_ms")?.as_i64()
 }
 fn observe(tx:&Transaction<'_>,now:i64)->Result<()> {
     tx.execute("UPDATE counters SET wall_floor=max(wall_floor,?1)",[now])?; Ok(())

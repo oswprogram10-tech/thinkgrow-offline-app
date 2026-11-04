@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-deliver-submissions"
+description = "Enables the deliver_submissions command without any pre-configured scope."
+commands.allow = ["deliver_submissions"]
+
+[[permission]]
+identifier = "deny-deliver-submissions"
+description = "Denies the deliver_submissions command without any pre-configured scope."
+commands.deny = ["deliver_submissions"]

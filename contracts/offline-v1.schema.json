@@ -184,7 +184,10 @@
       ],
       "properties": {
         "protocol": {
-          "const": 1
+          "enum": [
+            1,
+            2
+          ]
         },
         "operation_id": {
           "type": "string",
@@ -227,6 +230,11 @@
         "payload_hash": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
+        },
+        "created_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
         }
       }
     },

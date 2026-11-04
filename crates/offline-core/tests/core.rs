@@ -1,4 +1,5 @@
 use thinkgrow_offline_core::{*,crypto::{self,DataKey},transport::*};
+use thinkgrow_offline_core::registration::Registration;
 use ed25519_dalek::SigningKey;
 use tempfile::TempDir;
 use uuid::Uuid;
@@ -459,4 +460,127 @@ fn prepared_answer(l:&lesson::Lesson)->Answer{Answer{school_id:l.school_id.clone
  assert_eq!(ctx_res["session_token"].as_str().unwrap(),valid_token);
  assert_eq!(ctx_res["allowed_origins"][0].as_str().unwrap(),"https://game.thinkgrow.kr");
  context.stop_game().unwrap();
+}
+
+fn resign(f:&Fixture,operation:&Operation)->Envelope {
+ Envelope{operation:operation.clone(),proof:crypto::sign(&f.device,"thinkgrow.operation.v1",&serde_json::to_vec(operation).unwrap())}
+}
+
+#[test]fn protocol1_operation_bytes_unchanged(){
+ let f=Fixture::new();let answer=answer("legacy");let payload_hash=crypto::hash(&serde_json::to_vec(&answer).unwrap());
+ let operation=Operation{protocol:1,operation_id:Uuid::new_v4().to_string(),origin_device_id:"device".into(),device_seq:1,
+  subject_id:"actor".into(),app_id:App::Student.id().into(),credential_epoch:1,kind:"submission".into(),
+  answer,draft_revision:1,payload_hash,created_ms:None};
+ let raw=serde_json::to_string(&operation).unwrap();assert!(!raw.contains("created_ms"));
+ resign(&f,&operation).verify(&f.grant(App::Student,1)).unwrap();
+ let fixture:serde_json::Value=serde_json::from_str(include_str!("../../../contracts/fixtures/python-signed-v1.json")).unwrap();
+ let issuer:[u8;32]=crypto::decode(fixture["issuer_public_key"].as_str().unwrap()).unwrap().try_into().unwrap();
+ let signed:Signed=serde_json::from_value(fixture["credential"].clone()).unwrap();
+ let grant:Grant=signed.verify(&[("fixture-issuer".into(),issuer)].into(),"thinkgrow.credential.v1").unwrap();
+ let envelope:Envelope=serde_json::from_value(fixture["envelope"].clone()).unwrap();
+ assert!(envelope.operation.created_ms.is_none());envelope.verify(&grant).unwrap();
+}
+
+#[test]fn new_submissions_use_protocol2_with_created_ms(){
+ assert_eq!(OPERATION_PROTOCOL,2);
+ let f=Fixture::new();let mut s=f.store();let envelope=submit(&mut s);
+ assert_eq!(envelope.operation.protocol,OPERATION_PROTOCOL);
+ assert_eq!(envelope.operation.created_ms,Some(NOW));
+ envelope.verify(&f.grant(App::Student,1)).unwrap();
+}
+
+#[test]fn envelope_verify_rejects_protocol_created_ms_mismatch(){
+ let f=Fixture::new();let mut s=f.store();let envelope=submit(&mut s);let grant=f.grant(App::Student,1);
+ let mut legacy=envelope.operation.clone();legacy.protocol=1;legacy.created_ms=None;
+ resign(&f,&legacy).verify(&grant).unwrap();
+ for (protocol,created_ms) in [(1,Some(NOW)),(2,None),(3,Some(NOW)),(3,None)] {
+  let mut operation=envelope.operation.clone();operation.protocol=protocol;operation.created_ms=created_ms;
+  assert!(matches!(resign(&f,&operation).verify(&grant),Err(Error::Invalid(_))));
+ }
+}
+
+#[test]fn online_receipt_supersedes_classroom_delivery(){
+ let f=Fixture::new();let mut s=f.store();let envelope=submit(&mut s);
+ let classroom=s.lease(Destination::Classroom,NOW).unwrap().unwrap();assert_eq!(classroom.destination,Destination::Classroom);
+ assert!(s.accept_receipt(&f.receipt(&envelope,Destination::Online),Destination::Online).unwrap());
+ assert_eq!(s.pending(Destination::Classroom).unwrap(),0);
+ assert_eq!(s.pending(Destination::Online).unwrap(),0);
+ assert!(s.lease(Destination::Classroom,NOW+61_000).unwrap().is_none());
+ let db=Connection::open(s.storage_path().join("store.sqlite3")).unwrap();
+ let (state,lease):(String,Option<String>)=db.query_row(
+  "SELECT state,lease FROM deliveries WHERE operation_id=?1 AND destination='classroom'",
+  [&envelope.operation.operation_id],|r|Ok((r.get(0)?,r.get(1)?))).unwrap();
+ assert_eq!(state,"superseded");assert!(lease.is_none());
+}
+
+enum Step { Receipt, Retry, Conflict, Auth }
+struct Scripted { online:SigningKey, steps:std::collections::VecDeque<Step> }
+impl Transport for Scripted {
+ fn send(&mut self,_:Destination,envelope:&Envelope)->Result<Reply>{
+  match self.steps.pop_front().unwrap_or(Step::Retry) {
+   Step::Receipt=>{
+    let receipt=Receipt{protocol:1,operation_id:envelope.operation.operation_id.clone(),origin_device_id:"device".into(),
+     subject_id:"actor".into(),payload_hash:envelope.operation.payload_hash.clone(),destination:Destination::Online,
+     receipt_id:Uuid::new_v4().to_string(),server_received_ms:runtime::now()};
+    let payload=serde_json::to_string(&receipt).unwrap();
+    Ok(Reply::Receipt(Signed{key_id:"online".into(),signature:crypto::sign(&self.online,"thinkgrow.receipt.v1",payload.as_bytes()),payload}))
+   }
+   Step::Retry=>Ok(Reply::Retry{retry_after_ms:Some(60000)}),
+   Step::Conflict=>Ok(Reply::Conflict{remote_snapshot:"{\"code\":\"OFFLINE_CONFLICT\"}".into()}),
+   Step::Auth=>Ok(Reply::AuthenticationRequired),
+  }
+ }
+}
+
+#[test]fn deliver_online_stops_when_idle_and_counts(){
+ use std::sync::Arc;
+ let f=Fixture::new();let current=runtime::now();let mut grant=f.grant(App::Student,1);
+ grant.issued_ms=current-1000;grant.expires_ms=current+600_000;
+ let context=Arc::new(runtime::NativeContext::new(f.dir.path().to_path_buf(),App::Student));
+ context.attach_registered_account(runtime::NativeAccount{subject:"actor".into(),device:"device".into(),
+  data_key:DataKey::new([2;32]),device_signer:f.device.clone()},f.trust(),Some(&f.signed(&grant)),current,Some(current)).unwrap();
+ for revision in 1..=4u64 {context.save(&answer(&format!("answer {revision}")),revision-1).unwrap();
+  context.submit("assignment",revision,&Uuid::new_v4().to_string()).unwrap();}
+ let transport=Scripted{online:f.online.clone(),steps:[Step::Receipt,Step::Retry,Step::Conflict,Step::Auth].into()};
+ let registration=Registration::new(f.dir.path(),App::Student,context.clone()).unwrap().with_online_transport(transport);
+ let summary=registration.deliver_online().unwrap();
+ assert_eq!((summary.received,summary.deferred,summary.auth_required,summary.conflicts,summary.remaining),(1,1,1,1,3));
+ let states=context.submission_states("assignment").unwrap();assert_eq!(states.len(),4);
+ assert!(states.iter().any(|state|state.online_state=="received"&&state.server_received_ms.is_some()));
+ assert!(states.iter().all(|state|state.created_ms.is_some()));
+}
+
+#[test]fn deliver_online_is_noop_when_locked(){
+ use std::sync::Arc;
+ struct Panic;impl Transport for Panic{fn send(&mut self,_:Destination,_:&Envelope)->Result<Reply>{panic!("transport must not run while locked")}}
+ let f=Fixture::new();let context=Arc::new(runtime::NativeContext::new(f.dir.path().to_path_buf(),App::Student));
+ let registration=Registration::new(f.dir.path(),App::Student,context).unwrap().with_online_transport(Panic);
+ assert_eq!(registration.deliver_online().unwrap(),DeliverySummary::default());
+}
+
+#[test]fn http_reply_mapping(){
+ use thinkgrow_offline_core::online_transport::{map_response,HttpTransport};
+ let receipt=Receipt{protocol:1,operation_id:Uuid::new_v4().to_string(),origin_device_id:"device".into(),
+  subject_id:"actor".into(),payload_hash:"a".repeat(64),destination:Destination::Online,
+  receipt_id:"receipt-1".into(),server_received_ms:NOW};
+ let signed=Signed{key_id:"online".into(),payload:serde_json::to_string(&receipt).unwrap(),signature:String::new()};
+ let body=serde_json::to_vec(&serde_json::json!({"receipt":signed})).unwrap();
+ match map_response(200,None,&body).unwrap(){Reply::Receipt(value)=>assert_eq!(value.key_id,"online"),_=>panic!()}
+ let extra=serde_json::to_vec(&serde_json::json!({"receipt":signed,"extra":true})).unwrap();
+ assert!(matches!(map_response(200,None,&extra),Err(Error::RegistrationFailed)));
+ assert!(matches!(map_response(401,None,b"").unwrap(),Reply::AuthenticationRequired));
+ match map_response(403,None,br#"{"remote_snapshot":"snap"}"#).unwrap(){
+  Reply::Conflict{remote_snapshot}=>assert_eq!(remote_snapshot,"snap"),_=>panic!()}
+ match map_response(409,None,br#"{"code":"OFFLINE_CONFLICT"}"#).unwrap(){
+  Reply::Conflict{remote_snapshot}=>assert_eq!(remote_snapshot,"{\"status\":409,\"code\":\"OFFLINE_CONFLICT\"}"),_=>panic!()}
+ match map_response(400,None,b"not json").unwrap(){
+  Reply::Conflict{remote_snapshot}=>assert_eq!(remote_snapshot,"{\"status\":400,\"code\":\"\"}"),_=>panic!()}
+ match map_response(429,Some("3"),b"").unwrap(){Reply::Retry{retry_after_ms}=>assert_eq!(retry_after_ms,Some(3000)),_=>panic!()}
+ match map_response(503,Some("later"),b"").unwrap(){Reply::Retry{retry_after_ms}=>assert_eq!(retry_after_ms,None),_=>panic!()}
+ assert!(matches!(map_response(500,None,b""),Err(Error::RegistrationFailed)));
+ let mut transport=HttpTransport::new("https://example.invalid".into(),signed);
+ let envelope=resign(&Fixture::new(),&Operation{protocol:1,operation_id:Uuid::new_v4().to_string(),origin_device_id:"device".into(),
+  device_seq:1,subject_id:"actor".into(),app_id:App::Student.id().into(),credential_epoch:1,kind:"submission".into(),
+  answer:answer("offline"),draft_revision:1,payload_hash:"b".repeat(64),created_ms:None});
+ assert!(matches!(transport.send(Destination::Classroom,&envelope),Err(Error::Invalid(_))));
 }

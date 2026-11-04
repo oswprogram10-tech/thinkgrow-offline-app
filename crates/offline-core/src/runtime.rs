@@ -1,4 +1,5 @@
-use crate::{crypto::DataKey,App,Answer,Draft,Envelope,Error,Result,Signed,Status,Store,Trust,PROTOCOL,SCHEMA};
+use crate::{crypto::DataKey,Access,App,Answer,Destination,Draft,Envelope,Error,Result,Signed,Status,Store,SubmissionState,Trust,PROTOCOL,SCHEMA};
+use crate::transport::{DeliverySummary,Transport};
 use ed25519_dalek::SigningKey;
 use serde::Serialize;
 use std::{path::PathBuf,sync::{Mutex,MutexGuard},time::{Instant,SystemTime,UNIX_EPOCH}};
@@ -57,6 +58,21 @@ impl NativeContext {
     pub fn submit_prepared(&self,assignment:&str,revision:u64,intent:&str)->Result<Envelope>{
         let intent=uuid::Uuid::parse_str(intent).map_err(|_|Error::Invalid("submission intent"))?;
         let current=self.checked_now();self.lock()?.as_mut().ok_or(Error::Authorization)?.submit_prepared(assignment,revision,intent,current)
+    }
+    pub(crate) fn credential(&self)->Result<Signed> {
+        self.lock()?.as_ref().ok_or(Error::Authorization)?.signed_grant()
+    }
+    pub(crate) fn deliver_online(&self,transport:&mut dyn Transport)->Result<DeliverySummary> {
+        let current=self.checked_now();
+        let mut session=self.lock()?;
+        let Some(store)=session.as_mut() else{return Ok(DeliverySummary::default())};
+        if self.app!=App::Student || store.access(current)?!=Access::ReadWrite {
+            return Ok(DeliverySummary::default());
+        }
+        crate::transport::deliver(store,transport,Destination::Online,current,20)
+    }
+    pub fn submission_states(&self,assignment:&str)->Result<Vec<SubmissionState>> {
+        self.lock()?.as_ref().ok_or(Error::Authorization)?.submission_states(assignment)
     }
     pub fn role_workspace(&self)->Result<Option<crate::workspace::RoleReply>>{self.lock()?.as_ref().ok_or(Error::Authorization)?.role_workspace()}
     pub fn role_drafts(&self)->Result<Vec<crate::workspace::RoleDraft>>{self.lock()?.as_ref().ok_or(Error::Authorization)?.role_drafts()}

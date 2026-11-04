@@ -10,7 +10,29 @@ pub enum Reply {
 pub trait Transport { fn send(&mut self,destination:Destination,envelope:&Envelope)->Result<Reply>; }
 #[derive(Debug,PartialEq)]
 pub enum Tick { Idle, Received, Deferred, AuthenticationRequired, Conflict }
-pub fn tick(store:&mut Store,transport:&mut impl Transport,destination:Destination,now:i64)->Result<Tick> {
+/// Result of one bounded delivery pass. `remaining` is the still-pending count
+/// for the destination after the pass.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize)]
+pub struct DeliverySummary {
+    pub received:u32, pub deferred:u32, pub auth_required:u32, pub conflicts:u32, pub remaining:u64,
+}
+/// Drain eligible deliveries up to `max` lease attempts. Authentication and
+/// conflict outcomes leave the item for a later pass and do not stop the loop.
+pub fn deliver(store:&mut Store,transport:&mut dyn Transport,destination:Destination,now:i64,max:usize)->Result<DeliverySummary> {
+    let mut summary=DeliverySummary::default();
+    for _ in 0..max {
+        match tick(store,transport,destination,now)? {
+            Tick::Idle=>break,
+            Tick::Received=>summary.received=summary.received.saturating_add(1),
+            Tick::Deferred=>summary.deferred=summary.deferred.saturating_add(1),
+            Tick::AuthenticationRequired=>summary.auth_required=summary.auth_required.saturating_add(1),
+            Tick::Conflict=>summary.conflicts=summary.conflicts.saturating_add(1),
+        }
+    }
+    summary.remaining=store.pending(destination)?;
+    Ok(summary)
+}
+pub fn tick(store:&mut Store,transport:&mut dyn Transport,destination:Destination,now:i64)->Result<Tick> {
     let Some(lease)=store.lease(destination,now)? else{return Ok(Tick::Idle)};
     match transport.send(destination,&lease.envelope) {
         Ok(Reply::Receipt(signed))=>{

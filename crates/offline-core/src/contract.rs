@@ -2,6 +2,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use crate::{crypto, Error, Result};
 pub const PROTOCOL: u32=1;
+/// Operation protocol 2 adds the device-created timestamp used for deadline judging.
+/// Grant, Receipt and Lesson keep using `PROTOCOL` (1).
+pub const OPERATION_PROTOCOL: u32=2;
 pub const SCHEMA: u32=1;
 pub const MAX_TEXT: usize=2*1024*1024;
 pub const MAX_BLOB: usize=15*1024*1024;
@@ -69,6 +72,7 @@ pub struct Operation {
     pub protocol:u32, pub operation_id:String, pub origin_device_id:String, pub device_seq:u64,
     pub subject_id:String, pub app_id:String, pub credential_epoch:u64,
     pub kind:String, pub answer:Answer, pub draft_revision:u64, pub payload_hash:String,
+    #[serde(default, skip_serializing_if = "Option::is_none")] pub created_ms:Option<i64>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -76,8 +80,15 @@ pub struct Envelope { pub operation:Operation, pub proof:String }
 impl Envelope {
     pub fn verify(&self, grant:&Grant)->Result<()> {
         let o=&self.operation;
+        // Protocol 1 predates the device timestamp and must keep its exact byte
+        // form. Protocol 2 requires a non-negative device creation time.
+        let created_ok=match o.protocol {
+            1=>o.created_ms.is_none(),
+            2=>o.created_ms.is_some_and(|created|created>=0),
+            _=>false,
+        };
         if grant.app_id!=App::Student.id() || o.device_seq==0 || o.device_seq>i64::MAX as u64 ||
-            o.draft_revision==0 || o.draft_revision>i64::MAX as u64 || o.protocol!=PROTOCOL || o.origin_device_id!=grant.device_id || o.subject_id!=grant.subject_id ||
+            o.draft_revision==0 || o.draft_revision>i64::MAX as u64 || !created_ok || o.origin_device_id!=grant.device_id || o.subject_id!=grant.subject_id ||
             o.app_id!=grant.app_id || o.credential_epoch>grant.epoch || o.kind!="submission" ||
             o.payload_hash!=crypto::hash(&serde_json::to_vec(&o.answer)?) {
             return Err(Error::Invalid("operation binding")); }

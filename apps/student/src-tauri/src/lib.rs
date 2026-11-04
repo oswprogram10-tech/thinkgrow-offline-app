@@ -61,6 +61,15 @@ fn queue_submission(state:tauri::State<'_,Arc<NativeContext>>,assignment:String,
  state.submit_prepared(&assignment,revision,&intent).map_err(|e|e.to_string())
 }
 #[tauri::command]
+fn submission_states(state:tauri::State<'_,Arc<NativeContext>>,assignment:String)->Result<Vec<thinkgrow_offline_core::SubmissionState>,String>{
+ state.submission_states(&assignment).map_err(|e|e.to_string())
+}
+#[tauri::command]
+async fn deliver_submissions(state:tauri::State<'_,Arc<Registration>>)->Result<thinkgrow_offline_core::DeliverySummary,String>{
+ let registration=state.inner().clone();
+ tauri::async_runtime::spawn_blocking(move||registration.deliver_online().map_err(|e|e.to_string())).await.map_err(|_|"submission delivery interrupted; queued copies preserved".to_string())?
+}
+#[tauri::command]
 fn list_lessons(state:tauri::State<'_,Arc<NativeContext>>)->Result<Vec<thinkgrow_offline_core::lesson::Lesson>,String>{state.lessons().map_err(|e|e.to_string())}
 #[tauri::command]
 async fn prepare_lessons(state:tauri::State<'_,Arc<Registration>>)->Result<Vec<thinkgrow_offline_core::lesson::Lesson>,String>{
@@ -129,6 +138,6 @@ pub fn run(){
    app.manage(Arc::new(Registration::with_adapters(&base,App::Student,context.clone(),protector,transport)?));
    app.manage(context);
    Ok(())
- }).invoke_handler(tauri::generate_handler![load_role_workspace,role_exchange,list_games,launch_game,stop_game,list_class_materials,launch_material_app,open_material_file,save_material_chunk,delete_material,launch_online_game,core_status,list_lessons,prepare_lessons,load_draft,save_draft,queue_submission,open_registration_page,account_status,register_account,unlock_account,change_account_pin,recover_account_pin,export_account_backup,restore_account_backup,lock_account])
+ }).invoke_handler(tauri::generate_handler![load_role_workspace,role_exchange,list_games,launch_game,stop_game,list_class_materials,launch_material_app,open_material_file,save_material_chunk,delete_material,launch_online_game,core_status,list_lessons,prepare_lessons,load_draft,save_draft,queue_submission,submission_states,deliver_submissions,open_registration_page,account_status,register_account,unlock_account,change_account_pin,recover_account_pin,export_account_backup,restore_account_backup,lock_account])
  .run(tauri::generate_context!()).expect("failed to run ThinkGrow offline app");
 }
