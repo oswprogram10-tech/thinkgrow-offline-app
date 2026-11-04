@@ -8,6 +8,8 @@
     "offline-credential-20261103"
   ],
   "classroom_receipt_keys": {},
-  "online_receipt_keys": {},
+  "online_receipt_keys": {
+    "offline-receipt-20261105": "qYeeh7ub/vK5is0Bo7mcjmFUugzMWpq5UMROhuGxd+E="
+  },
   "registration_enabled": true
 }

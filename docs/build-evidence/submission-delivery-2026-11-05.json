@@ -1,0 +1,34 @@
+{
+  "build": "windows-development-20261105-r4",
+  "purpose": "OFF-SUB-01 online submission delivery with the production online receipt key pinned",
+  "source_commit_base": "e7f560c",
+  "policy_change": {
+    "file": "release/native-policy.json",
+    "online_receipt_keys": {
+      "offline-receipt-20261105": "qYeeh7ub/vK5is0Bo7mcjmFUugzMWpq5UMROhuGxd+E="
+    },
+    "public_fingerprint": "881e2d3182d253b0069b650e16933fb44ad9c458ab8ba90d429024f37c5919d4",
+    "server_release": "platform docs/offline-submission-release-2026-11-05.json (thinkgrow-offline-api-00007-4rl)"
+  },
+  "checks": {
+    "cargo_test_offline_core": "73 passed",
+    "cargo_check_teacher_student_parent": "passed",
+    "verify_account_ui": "passed (6 checks, synthetic only)",
+    "test_release_bridge": "OK"
+  },
+  "packages_unpublished": {
+    "thinkgrow-student-0.1.0-windows-x64-setup.exe": "5357fa3592af39a33ca5b7f4c52025f14bee94d59360f53a39b8538aa4197585",
+    "thinkgrow-student-0.1.0-windows-x64-standalone.zip": "b42e0d96d4987e31bf35139abd0b88c4c650f972d874761fdbe4f584bdaf89b1",
+    "thinkgrow-teacher-0.1.0-windows-x64-setup.exe": "70c7ac43ab97e3673e20a930c9cb987150c44c75db2047bc8ff5bb00c2abda39",
+    "thinkgrow-teacher-0.1.0-windows-x64-standalone.zip": "bf8f42016d25ebd5d5cb8882bc60f7411d87c727cc3202274715c04c5fd42cd5"
+  },
+  "embedded_key_check": "student standalone exe contains the receipt key id offline-receipt-20261105",
+  "live_server_checks": {
+    "capabilities_online_receipt_keys": "matches the pinned key",
+    "post_submissions_empty_body": "400 INVALID_REQUEST"
+  },
+  "not_done": [
+    "end-to-end submission from an installed student app to production (needs a registered device and a real or synthetic class)",
+    "code signing and public distribution"
+  ]
+}
