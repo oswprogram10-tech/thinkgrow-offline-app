@@ -558,6 +558,61 @@ impl Transport for Scripted {
  assert_eq!(registration.deliver_online().unwrap(),DeliverySummary::default());
 }
 
+fn student_context(f:&Fixture)->std::sync::Arc<runtime::NativeContext>{
+ use std::sync::Arc;
+ let current=runtime::now();let mut grant=f.grant(App::Student,1);
+ grant.issued_ms=current-1000;grant.expires_ms=current+600_000;
+ let context=Arc::new(runtime::NativeContext::new(f.dir.path().to_path_buf(),App::Student));
+ context.attach_registered_account(runtime::NativeAccount{subject:"actor".into(),device:"device".into(),
+  data_key:DataKey::new([2;32]),device_signer:f.device.clone()},f.trust(),Some(&f.signed(&grant)),current,Some(current)).unwrap();
+ context
+}
+
+#[test]fn deliver_online_releases_the_session_lock_during_send(){
+ use std::sync::{Arc,atomic::{AtomicU32,Ordering}};
+ struct Probe{context:Arc<runtime::NativeContext>,sends:Arc<AtomicU32>}
+ impl Transport for Probe{
+  fn send(&mut self,_:Destination,_:&Envelope)->Result<Reply>{
+   self.context.status().unwrap();
+   self.context.save(&answer("saved while sending"),1).unwrap();
+   self.sends.fetch_add(1,Ordering::SeqCst);
+   Ok(Reply::Retry{retry_after_ms:Some(60000)})
+  }
+ }
+ let f=Fixture::new();let context=student_context(&f);
+ context.save(&answer("original"),0).unwrap();
+ context.submit("assignment",1,&Uuid::new_v4().to_string()).unwrap();
+ let sends=Arc::new(AtomicU32::new(0));
+ let transport=Probe{context:context.clone(),sends:sends.clone()};
+ let registration=Registration::new(f.dir.path(),App::Student,context.clone()).unwrap().with_online_transport(transport);
+ let summary=registration.deliver_online().unwrap();
+ assert_eq!(sends.load(Ordering::SeqCst),1);
+ assert_eq!(summary.deferred,1);
+ assert_eq!(context.load("assignment").unwrap().unwrap().revision,2);
+}
+
+#[test]fn deliver_online_discards_result_when_account_locks_during_send(){
+ use std::sync::{Arc,atomic::{AtomicBool,Ordering}};
+ struct Locker{context:Arc<runtime::NativeContext>,sent:Arc<AtomicBool>}
+ impl Transport for Locker{
+  fn send(&mut self,_:Destination,_:&Envelope)->Result<Reply>{
+   self.context.lock_account().unwrap();
+   self.sent.store(true,Ordering::SeqCst);
+   Ok(Reply::Retry{retry_after_ms:Some(60000)})
+  }
+ }
+ let f=Fixture::new();let context=student_context(&f);
+ context.save(&answer("original"),0).unwrap();
+ context.submit("assignment",1,&Uuid::new_v4().to_string()).unwrap();
+ let sent=Arc::new(AtomicBool::new(false));
+ let transport=Locker{context:context.clone(),sent:sent.clone()};
+ let registration=Registration::new(f.dir.path(),App::Student,context.clone()).unwrap().with_online_transport(transport);
+ let summary=registration.deliver_online().unwrap();
+ assert!(sent.load(Ordering::SeqCst));
+ assert_eq!(summary,DeliverySummary::default());
+ assert!(context.status().unwrap().registration_required);
+}
+
 #[test]fn http_reply_mapping(){
  use thinkgrow_offline_core::online_transport::{map_response,HttpTransport};
  let receipt=Receipt{protocol:1,operation_id:Uuid::new_v4().to_string(),origin_device_id:"device".into(),
