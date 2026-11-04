@@ -47,6 +47,7 @@ impl Store {
         store.recover_blobs()?;
         Ok(store)
     }
+    pub(crate) fn app_kind(&self)->App { self.app }
     pub fn install_grant(&mut self, signed:&Signed, now:i64)->Result<()> {
         let g:Grant=signed.verify(&self.trust.credentials,"thinkgrow.credential.v1")?;
         if g.protocol!=PROTOCOL || g.app_id!=self.app.id() || g.subject_id!=self.subject ||
