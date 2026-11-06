@@ -91,7 +91,17 @@
     try{if(!revision){dirty=true;serial++;}await persist();await saving;if(mine!==generation||dirty||failed)return;queuedIntent ||= crypto.randomUUID();await invoke("queue_submission",{assignment:current.assignment_id,revision,intent:queuedIntent});if(mine===generation){onlinePending=true;answerState("제출 대기 중: 인터넷이 연결되면 보냅니다");refreshStates();deliver();}}
     catch{if(mine===generation)answerState("제출 대기열에 보관하지 못했습니다. 작성한 초안은 유지합니다.",true);}finally{if(mine===generation)$("queue-answer").disabled=!writable();}
   });
-  $("prepare-lessons").addEventListener("click",async()=>{if(!session?.local||dirty){notice("작성 중인 답안을 먼저 기기에 저장하세요.",true);return;}const mine=generation;$("prepare-lessons").disabled=true;notice("등록한 수업을 준비하고 있습니다.");try{const prepared=await invoke("prepare_lessons");if(mine!==generation)return;lessons=prepared;repaintList();notice("수업을 이 기기에 보관했습니다. 이제 인터넷 없이 작성할 수 있습니다.");}catch{if(mine===generation)notice("수업을 준비하지 못했습니다. 온라인 연결과 기기 등록 때 선택한 수업을 확인하세요. 기존 자료는 보존됩니다.",true);}finally{gate();}});
+  const lessonRefusals={
+    OFFLINE_CLASS_NOT_READY:"학교에 연결되지 않은 학급의 수업이 있어 준비하지 못했습니다. 선생님께 학급을 학교에 연결해 달라고 말씀드리세요.",
+    OFFLINE_SCOPE_DENIED:"기기를 등록한 뒤 수업 연결이 바뀌었습니다. 온라인에서 기기 등록을 다시 하고 수업을 골라 주세요.",
+    OFFLINE_LESSON_NOT_OPEN:"아직 열리지 않았거나 이미 끝난 수업이 있습니다. 선생님께 수업이 열려 있는지 확인해 주세요.",
+    OFFLINE_QUESTION_UNSUPPORTED:"이 앱에서 아직 풀 수 없는 문항 유형이 있습니다. 그 수업은 온라인에서 작성해 주세요.",
+    OFFLINE_REQUIRED_CONTENT_UNSUPPORTED:"첨부 자료나 게임이 필요한 수업이 있습니다. 그 수업은 온라인에서 작성해 주세요.",
+    OFFLINE_LESSON_TOO_LARGE:"수업 자료가 너무 커서 한 번에 준비하지 못했습니다. 기기 등록 때 수업을 나눠 골라 주세요.",
+    OFFLINE_DEVICE_REVOKED:"이 기기 등록이 해제되었습니다. 온라인에서 기기 등록을 다시 해 주세요."
+  };
+  function prepareFailure(error){const code=String(error?.message??error??"").match(/^lesson preparation rejected: ([A-Z_]+)$/)?.[1];return (code&&Object.hasOwn(lessonRefusals,code)?lessonRefusals[code]:"수업을 준비하지 못했습니다. 온라인 연결과 기기 등록 때 선택한 수업을 확인하세요.")+" 기존 자료는 보존됩니다.";}
+  $("prepare-lessons").addEventListener("click",async()=>{if(!session?.local||dirty){notice("작성 중인 답안을 먼저 기기에 저장하세요.",true);return;}const mine=generation;$("prepare-lessons").disabled=true;notice("등록한 수업을 준비하고 있습니다.");try{const prepared=await invoke("prepare_lessons");if(mine!==generation)return;lessons=prepared;repaintList();notice("수업을 이 기기에 보관했습니다. 이제 인터넷 없이 작성할 수 있습니다.");}catch(error){if(mine===generation)notice(prepareFailure(error),true);}finally{gate();}});
   async function applySession(core){session=core;wipe();gate();if(!session.local)return;const mine=generation;try{lessons=await invoke("list_lessons");if(mine!==generation)return;repaintList();notice(lessons.length?"보관한 수업을 선택하세요.":"기기에 보관한 수업이 없습니다. 온라인에서 수업을 준비하세요.");}catch{if(mine===generation)notice("수업 보관함을 열지 못했습니다. 기존 자료는 보존됩니다.",true);}onlinePending=(session.local.pending_online||0)>0;deliver();}
   window.addEventListener("thinkgrow-session",event=>applySession(event.detail));
   window.addEventListener("online",()=>{deliver();});

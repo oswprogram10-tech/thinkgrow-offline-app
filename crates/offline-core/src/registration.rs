@@ -404,6 +404,30 @@ mod tests {
     }
 }
 
+/// Maps a lesson-preparation refusal body to a known reason code. Only codes on
+/// this list reach the app screen; server text and unknown codes never do.
+pub(crate) fn lesson_rejection(body:&[u8])->Option<&'static str> {
+    if body.len()>4096 {return None}
+    #[derive(Deserialize)] struct Refusal {code:Option<String>}
+    let code=serde_json::from_slice::<Refusal>(body).ok()?.code?;
+    const KNOWN:[&str;7]=["OFFLINE_CLASS_NOT_READY","OFFLINE_SCOPE_DENIED","OFFLINE_LESSON_NOT_OPEN","OFFLINE_QUESTION_UNSUPPORTED","OFFLINE_REQUIRED_CONTENT_UNSUPPORTED","OFFLINE_LESSON_TOO_LARGE","OFFLINE_DEVICE_REVOKED"];
+    KNOWN.into_iter().find(|known|*known==code)
+}
+#[cfg(test)]
+mod lesson_rejection_tests {
+    use super::lesson_rejection;
+    #[test]
+    fn known_codes_pass_and_everything_else_is_dropped() {
+        assert_eq!(lesson_rejection(br#"{"error":"x","code":"OFFLINE_SCOPE_DENIED"}"#),Some("OFFLINE_SCOPE_DENIED"));
+        assert_eq!(lesson_rejection(br#"{"code":"OFFLINE_CLASS_NOT_READY"}"#),Some("OFFLINE_CLASS_NOT_READY"));
+        assert_eq!(lesson_rejection(br#"{"code":"SOMETHING_NEW"}"#),None);
+        assert_eq!(lesson_rejection(br#"{"error":"no code"}"#),None);
+        assert_eq!(lesson_rejection(b"not json"),None);
+        assert_eq!(lesson_rejection(&[b' ';4097]),None);
+        assert_eq!(super::Error::LessonRejected("OFFLINE_LESSON_NOT_OPEN").to_string(),"lesson preparation rejected: OFFLINE_LESSON_NOT_OPEN");
+    }
+}
+
 #[cfg(windows)]
 fn fetch_lessons(origin:&str,request:&[u8])->Result<Vec<Signed>> {
     use std::{io::Read,time::Duration};
@@ -411,7 +435,12 @@ fn fetch_lessons(origin:&str,request:&[u8])->Result<Vec<Signed>> {
     let client=reqwest::blocking::Client::builder().https_only(true).redirect(reqwest::redirect::Policy::none())
         .connect_timeout(Duration::from_secs(8)).timeout(Duration::from_secs(25)).build().map_err(|_|Error::RegistrationFailed)?;
     let response=client.post(format!("{origin}/api/offline/v1/lessons/prepare")).header("Content-Type","application/json").body(request.to_vec()).send().map_err(|_|Error::RegistrationFailed)?;
-    if response.status().as_u16()!=200 || response.content_length().is_some_and(|n|n>1048576){return Err(Error::RegistrationFailed)}
+    let status=response.status().as_u16();
+    if matches!(status,403|409|413) {
+        let mut body=Vec::new();let _=response.take(4097).read_to_end(&mut body);
+        return Err(lesson_rejection(&body).map_or(Error::RegistrationFailed,Error::LessonRejected));
+    }
+    if status!=200 || response.content_length().is_some_and(|n|n>1048576){return Err(Error::RegistrationFailed)}
     let mut raw=Zeroizing::new(Vec::new());response.take(1048577).read_to_end(&mut raw).map_err(|_|Error::RegistrationFailed)?;
     if raw.len()>1048576{return Err(Error::RegistrationFailed)}
     Ok(serde_json::from_slice::<Reply>(&raw).map_err(|_|Error::RegistrationFailed)?.lessons)

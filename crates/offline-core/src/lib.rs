@@ -27,6 +27,7 @@ pub enum Error {
     #[error("account unlock failed or temporarily locked; data preserved")] AccountLocked,
     #[error("this account has no protected recovery backup")] RecoveryUnavailable,
     #[error("registration request failed; pending device keys preserved")] RegistrationFailed,
+    #[error("lesson preparation rejected: {0}")] LessonRejected(&'static str),
     #[error("authorization required")] Authorization,
     #[error("credential expired or clock uncertain; data preserved")] ReadRecoveryOnly,
     #[error("revision conflict; both revisions preserved")] Conflict,
